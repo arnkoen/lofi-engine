@@ -258,14 +258,6 @@ typedef struct SoundProps {
     float max_range;
 } SoundProps;
 
-static inline SoundProps sound_props_default(void) {
-    SoundProps props;
-    props.volume = 0.75f;
-    props.min_range = 1.0f;
-    props.max_range = 100.f;
-    return props;
-}
-
 typedef struct SoundListener {
     HMM_Vec3 current_pos;
     HMM_Vec3 target_pos;

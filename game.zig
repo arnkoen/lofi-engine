@@ -1,14 +1,18 @@
 const lo = @import("lofi.zig");
 
 var ent: lo.Entity = .{};
+var model: lo.Model = .{};
+var tex_body: lo.Texture = .{};
+var tex_head: lo.Texture = .{};
+var snd: lo.Sound = .{};
 var time: f32 = 0;
 
 export fn lo_init() void {
     ent = lo.create();
-    const model = lo.loadModel("assets/game_base.iqm");
+    model = lo.loadModel("assets/game_base.iqm");
     const anims = lo.loadAnims("assets/game_base.iqm");
-    const tex_body = lo.loadTexture("assets/skin_body.dds");
-    const tex_head = lo.loadTexture("assets/skin_head.dds");
+    tex_body = lo.loadTexture("assets/skin_body.dds");
+    tex_head = lo.loadTexture("assets/skin_head.dds");
     lo.setModel(ent, model);
     lo.setTexture(ent, tex_body, 0);
     lo.setTexture(ent, tex_head, 1);
@@ -17,7 +21,7 @@ export fn lo_init() void {
         .anim = 0,
         .flags = lo.ANIM_LOOP | lo.ANIM_PLAY,
     });
-    const snd = lo.loadSound("assets/loop.ogg");
+    snd = lo.loadSound("assets/loop.ogg");
     lo.setSound(ent, &lo.SoundDesc{
         .sound = snd,
         .vol = 0.75,
@@ -43,4 +47,9 @@ export fn lo_frame(dt: f32) void {
 
 export fn lo_cleanup() void {
     lo.destroy(ent);
+    lo.releaseModel(model);
+    lo.releaseTexture(tex_body);
+    lo.releaseTexture(tex_head);
+    lo.releaseAnims();
+    lo.releaseSound(snd);
 }

@@ -3,14 +3,18 @@
 
 #define ASSET "assets/"
 lo_Entity ent = {0};
+lo_Model model = {0};
+lo_Texture tex_body = {0};
+lo_Texture tex_head = {0};
+lo_Sound snd = {0};
 float time = 0;
 
 void lo_init() {
     ent = lo_create();
-    lo_Model model = lo_load_model(ASSET"game_base.iqm");
+    model = lo_load_model(ASSET"game_base.iqm");
     lo_AnimSet anims = lo_load_anims(ASSET"game_base.iqm");
-    lo_Texture tex_body = lo_load_texture(ASSET"skin_body.dds");
-    lo_Texture tex_head = lo_load_texture(ASSET"skin_head.dds");
+    tex_body = lo_load_texture(ASSET"skin_body.dds");
+    tex_head = lo_load_texture(ASSET"skin_head.dds");
     lo_set_model(ent, model);
     lo_set_texture(ent, tex_body, 0);
     lo_set_texture(ent, tex_head, 1);
@@ -19,7 +23,7 @@ void lo_init() {
         .anim = 1,
         .flags = ANIM_LOOP | ANIM_PLAY,
     });
-    lo_Sound snd = lo_load_sound(ASSET"loop.ogg");
+    snd = lo_load_sound(ASSET"loop.ogg");
     lo_set_sound(ent, &(lo_SoundDesc) {
         .sound = snd,
         .vol = 0.75f,
@@ -49,4 +53,9 @@ void lo_frame(float dt) {
 
 void lo_cleanup() {
     lo_destroy(ent);
+    lo_release_model(model);
+    lo_release_texture(tex_body);
+    lo_release_texture(tex_head);
+    lo_release_anims();
+    lo_release_sound(snd);
 }

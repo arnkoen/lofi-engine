@@ -1781,5 +1781,5 @@ void entity_clear_sound(Scene* scene, Entity e) {
     scene->sound_flags[idx] = 0;
     scene->sound_buffers[idx].id = HP_INVALID_HANDLE;
     scene->sound_channels[idx] = (tm_channel){0};
-    scene->sound_props[idx] = sound_props_default();
+    scene->sound_props[idx] = (SoundProps){0};
 }

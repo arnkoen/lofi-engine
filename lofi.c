@@ -100,6 +100,19 @@ static uint32_t wa_load_sound(uint64_t path_ptr) {
     return lo_load_sound((const char*)wa_ptr((uint32_t)path_ptr)).id;
 }
 
+static void wa_release_texture(uint64_t id) {
+    gfx_release_texture(ctx.gfx, (TextureHandle){(uint32_t)id});
+}
+static void wa_release_model(uint64_t id) {
+    gfx_release_model(ctx.gfx, (ModelHandle){(uint32_t)id});
+}
+static void wa_release_anims(void) {
+    gfx_clear_anims(ctx.gfx);
+}
+static void wa_release_sound(uint64_t id) {
+    sfx_release_buffer(ctx.sfx, (SoundBufferHandle){(uint32_t)id});
+}
+
 static uint32_t wa_create(void) {
     return entity_new(ctx.scene).id;
 }
@@ -297,6 +310,10 @@ static RTLink link[] = {
     { "lo_load_model",     &wa_load_model,    0, WA_il },
     { "lo_load_anims",     &wa_load_anims,    0, WA_il },
     { "lo_load_sound",     &wa_load_sound,    0, WA_il },
+    { "lo_release_texture",&wa_release_texture,0, WA_vl },
+    { "lo_release_model",  &wa_release_model, 0, WA_vl },
+    { "lo_release_anims",  &wa_release_anims, 0, WA_v },
+    { "lo_release_sound",  &wa_release_sound, 0, WA_vl },
     { "lo_create",         &wa_create,        0, WA_i },
     { "lo_valid",          &wa_valid,         0, WA_il },
     { "lo_destroy",        &wa_destroy,       0, WA_vl },

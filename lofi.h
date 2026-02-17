@@ -19,15 +19,19 @@
 
 typedef struct lo_Texture { uint32_t id; } lo_Texture;
 IMPORT(lo_load_texture) lo_Texture lo_load_texture(const char* path);
+IMPORT(lo_release_texture) void lo_release_texture(lo_Texture tex);
 
 typedef struct lo_Model { uint32_t id; } lo_Model;
 IMPORT(lo_load_model) lo_Model lo_load_model(const char* path);
+IMPORT(lo_release_model) void lo_release_model(lo_Model model);
 
 typedef struct lo_AnimSet { uint32_t id; } lo_AnimSet;
 IMPORT(lo_load_anims) lo_AnimSet lo_load_anims(const char* path);
+IMPORT(lo_release_anims) void lo_release_anims(void);
 
 typedef struct lo_Sound { uint32_t id; } lo_Sound;
 IMPORT(lo_load_sound) lo_Sound lo_load_sound(const char* path);
+IMPORT(lo_release_sound) void lo_release_sound(lo_Sound sound);
 
 typedef struct lo_Entity { uint32_t id; } lo_Entity;
 

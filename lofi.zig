@@ -31,9 +31,13 @@ const env = struct {
     extern "env" fn lo_destroy(entity: Entity) void;
 
     extern "env" fn lo_load_texture(path: [*:0]const u8) Texture;
+    extern "env" fn lo_release_texture(tex: Texture) void;
     extern "env" fn lo_load_model(path: [*:0]const u8) Model;
+    extern "env" fn lo_release_model(model: Model) void;
     extern "env" fn lo_load_anims(path: [*:0]const u8) AnimSet;
+    extern "env" fn lo_release_anims() void;
     extern "env" fn lo_load_sound(path: [*:0]const u8) Sound;
+    extern "env" fn lo_release_sound(sound: Sound) void;
 
     extern "env" fn lo_set_position(e: Entity, pos: [*]const f32) void;
     extern "env" fn lo_get_position(e: Entity, out: [*]f32) void;
@@ -93,9 +97,13 @@ pub const valid = env.lo_valid;
 pub const destroy = env.lo_destroy;
 
 pub const loadTexture = env.lo_load_texture;
+pub const releaseTexture = env.lo_release_texture;
 pub const loadModel = env.lo_load_model;
+pub const releaseModel = env.lo_release_model;
 pub const loadAnims = env.lo_load_anims;
+pub const releaseAnims = env.lo_release_anims;
 pub const loadSound = env.lo_load_sound;
+pub const releaseSound = env.lo_release_sound;
 
 pub const setPosition = env.lo_set_position;
 pub const getPosition = env.lo_get_position;
