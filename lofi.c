@@ -30,6 +30,7 @@ static struct {
     tlsf_t tlsf;
     Allocator allocator;
     int function;
+    int fn_mouse_pos, fn_mouse_button, fn_key;
 } ctx;
 
 static inline void* wa_ptr(uint32_t offset) {
@@ -306,6 +307,9 @@ static RTLink link[] = {
     { "lo_init",           NULL,              0, WA_v },
     { "lo_frame",          NULL,              0, WA_vf },
     { "lo_cleanup",        NULL,              0, WA_v },
+    { "lo_mouse_pos",      NULL,              0, WA_vff },
+    { "lo_mouse_button",   NULL,              0, WA_vll },
+    { "lo_key",            NULL,              0, WA_vlll },
     //imports
     { "lo_load_texture",   &wa_load_texture,  0, WA_il },
     { "lo_load_model",     &wa_load_model,    0, WA_il },
@@ -395,6 +399,9 @@ static void reload_game() {
     ret = wa_call(&ctx.mod, ctx.function);
     //printf("WASM function returned: %lld (err_code %d)\n\n", ret.i64, ctx.mod.err_code);
     ctx.function = wa_sym(&ctx.mod, "lo_frame");
+    ctx.fn_mouse_pos = wa_sym(&ctx.mod, "lo_mouse_pos");
+    ctx.fn_mouse_button = wa_sym(&ctx.mod, "lo_mouse_button");
+    ctx.fn_key = wa_sym(&ctx.mod, "lo_key");
 }
 
 static void init(void) {
@@ -467,13 +474,36 @@ static void cleanup(void) {
 }
 
 static void event(const sapp_event* ev) {
-    if(ev->type == SAPP_EVENTTYPE_KEY_DOWN && ev->key_repeat == false) {
-        if (ev->key_code == SAPP_KEYCODE_F) {
-            sapp_toggle_fullscreen();
+    switch (ev->type) {
+    case SAPP_EVENTTYPE_MOUSE_MOVE:
+        if (ctx.fn_mouse_pos >= 0) {
+            wa_push_f32(&ctx.mod, ev->mouse_x);
+            wa_push_f32(&ctx.mod, ev->mouse_y);
+            wa_call(&ctx.mod, ctx.fn_mouse_pos);
         }
-        if(ev->key_code == SAPP_KEYCODE_R) {
-            reload_game();
+        break;
+    case SAPP_EVENTTYPE_MOUSE_DOWN:
+    case SAPP_EVENTTYPE_MOUSE_UP:
+        if (ctx.fn_mouse_button >= 0) {
+            wa_push_i32(&ctx.mod, (int32_t)ev->mouse_button);
+            wa_push_i32(&ctx.mod, ev->type == SAPP_EVENTTYPE_MOUSE_DOWN ? 1 : 0);
+            wa_call(&ctx.mod, ctx.fn_mouse_button);
         }
+        break;
+    case SAPP_EVENTTYPE_KEY_DOWN:
+        if (!ev->key_repeat) {
+            if (ev->key_code == SAPP_KEYCODE_F) sapp_toggle_fullscreen();
+            if (ev->key_code == SAPP_KEYCODE_R) reload_game();
+        }
+    case SAPP_EVENTTYPE_KEY_UP:
+        if (ctx.fn_key >= 0) {
+            wa_push_i32(&ctx.mod, (int32_t)ev->key_code);
+            wa_push_i32(&ctx.mod, ev->type == SAPP_EVENTTYPE_KEY_DOWN ? 1 : 0);
+            wa_push_i32(&ctx.mod, ev->key_repeat ? 1 : 0);
+            wa_call(&ctx.mod, ctx.fn_key);
+        }
+        break;
+    default: break;
     }
 }
 

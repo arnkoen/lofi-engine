@@ -1387,6 +1387,15 @@ void sfx_update(AudioContext* ctx, HMM_Vec3 listener_pos, HMM_Vec3 listener_forw
     }
 }
 
+void sfx_reset(AudioContext* ctx) {
+    tm_stop_all_sources();
+    for (int i = 0; i < ctx->buffers.pool.count; i++) {
+        hp_Handle hnd = hp_handle_at(&ctx->buffers.pool, i);
+        tm_release_buffer(ctx->buffers.data[hp_index(hnd)]);
+    }
+    hp_reset(&ctx->buffers.pool);
+}
+
 void sfx_shutdown(AudioContext* ctx) {
     if (saudio_isvalid()) {
         tm_stop_all_sources();
@@ -1424,14 +1433,6 @@ void sfx_release_buffer(AudioContext* ctx, SoundBufferHandle buf) {
     hp_release_handle(&ctx->buffers.pool, buf.id);
 }
 
-void sfx_reset(AudioContext* ctx) {
-    tm_stop_all_sources();
-    for (int i = 0; i < ctx->buffers.pool.count; i++) {
-        hp_Handle hnd = hp_handle_at(&ctx->buffers.pool, i);
-        tm_release_buffer(ctx->buffers.data[hp_index(hnd)]);
-    }
-    hp_reset(&ctx->buffers.pool);
-}
 
 
 //--SCENE------------------------------------------------------------------------------------

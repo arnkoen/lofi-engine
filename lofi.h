@@ -96,3 +96,7 @@ IMPORT(lo_dtx_putr) void lo_dtx_putr(const char* str, int len);
 EXPORT(lo_init) void lo_init();
 EXPORT(lo_frame) void lo_frame(float dt);
 EXPORT(lo_cleanup) void lo_cleanup();
+
+EXPORT(lo_mouse_pos) void lo_mouse_pos(float x, float y);
+EXPORT(lo_mouse_button) void lo_mouse_button(int button, bool down);
+EXPORT(lo_key) void lo_key(int keycode, bool down, bool repeat);

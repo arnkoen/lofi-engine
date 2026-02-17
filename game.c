@@ -48,7 +48,7 @@ void lo_frame(float dt) {
     lo_dtx_canvas(800.0f * 0.5f, 600.0f * 0.5f);
     lo_dtx_origin(1.0f, 1.0f);
     lo_dtx_color3b(255, 255, 255);
-    lo_dtx_puts("Hello Lofi");
+    lo_dtx_puts("Hello Lofi\n");
 }
 
 void lo_cleanup() {
@@ -58,4 +58,14 @@ void lo_cleanup() {
     lo_release_texture(tex_head);
     lo_release_anims();
     lo_release_sound(snd);
+}
+
+void lo_key(int keycode, bool down, bool repeat) {
+    lo_dtx_origin(1.0f, 2.0f);
+    if (down) {
+        lo_dtx_puts("down\n");
+    }
+    if (repeat) {
+        lo_dtx_puts("repeat\n");
+    }
 }
