@@ -223,6 +223,7 @@ typedef struct RenderContext {
 
 RenderContext* gfx_new_context(Allocator* alloc, const RenderContextDesc* desc);
 void gfx_render(RenderContext* gfx, Scene* scene, Camera* cam, sg_swapchain swapchain, float dt);
+void gfx_reset(RenderContext* gfx);
 void gfx_shutdown(RenderContext* gfx);
 void gfx_load_cubemap(RenderContext* ctx, ArenaAlloc* alloc, IoMemory* mem);
 
@@ -281,6 +282,7 @@ typedef struct AudioContext {
 
 AudioContext* sfx_new_context(Allocator* alloc, uint16_t max_buffers);
 void sfx_update(AudioContext* sfx, HMM_Vec3 listener_pos, HMM_Vec3 listener_forward, Scene* scene, float dt);
+void sfx_reset(AudioContext* sfx);
 void sfx_shutdown(AudioContext* sfx);
 
 typedef struct SoundBufferHandle { hp_Handle id; } SoundBufferHandle;
@@ -345,6 +347,7 @@ typedef struct Scene {
 } Scene;
 
 Scene* scene_new(Allocator* alloc, uint16_t max_things);
+void scene_reset(Scene* scene);
 void scene_destroy(Allocator* alloc, Scene* scene);
 Entity entity_new(Scene* scene);
 bool entity_valid(Scene* scene, Entity entity);

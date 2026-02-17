@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "thread.h"
 #include "vorbis.c"
 
 enum {
@@ -30,6 +31,7 @@ typedef struct buffer_functions_t {
 
 typedef struct buffer_t {
 	const buffer_functions_t* funcs;
+	mt_atomic_int32 refcnt;
 } buffer_t;
 
 typedef struct static_source_data_t {
@@ -73,6 +75,7 @@ typedef struct source_t {
 #define SPEAKER_DIST 0.17677669529663688110021109052621f // 1/(4 *sqrtf(2))
 
 static struct {
+	mt_mutex lock;
 	tm_callbacks callbacks;
 	float position[3];
 	float forward[3];
@@ -103,11 +106,14 @@ static inline float _tm_dist(const float* a, const float* b) {
 static inline void _tm_vcopy(float* v, const float* a) { v[0] = a[0], v[1] = a[1], v[2] = a[2]; }
 
 static void _tm_addref(buffer_t* buffer) {
+	mt_atomic_increment(&buffer->refcnt);
 }
 
 static void _tm_decref(buffer_t* buffer) {
+	if (0 == mt_atomic_decrement(&buffer->refcnt)) {
 		buffer->funcs->on_destroy(buffer);
 		tm.callbacks.free(tm.callbacks.udata, buffer);
+	}
 }
 
 static void kill_source(source_t* source) {
@@ -117,7 +123,9 @@ static void kill_source(source_t* source) {
 		channel.index = (int)(source - tm.sources) + 1;
 
 		// unlock the mutex while in the user callback
+		mt_mutex_unlock(&tm.lock);
 		tm.callbacks.channel_complete(tm.callbacks.udata, source->opaque, channel);
+		mt_mutex_lock(&tm.lock);
 	}
 
 	if (source->buffer) {
@@ -352,6 +360,7 @@ static void mix(float* buffer) {
 }
 
 void tm_getsamples(float* samples, int nsamples) {
+	mt_mutex_lock(&tm.lock);
 
 	// was data leftover after the previous call to getsamples? Copy that out here
 	while (nsamples && tm.samples_remaining) {
@@ -385,10 +394,13 @@ void tm_getsamples(float* samples, int nsamples) {
 		nsamples -= samples_to_mix;
 	}
 
+	mt_mutex_unlock(&tm.lock);
 }
 
 void tm_set_mastergain(float gain) {
+	mt_mutex_lock(&tm.lock);
 	tm.gain_master = gain;
+	mt_mutex_unlock(&tm.lock);
 }
 
 static source_t* add(const tm_buffer* handle, int gain_index, float gain, float pitch) {
@@ -482,7 +494,7 @@ void tm_create_buffer_interleaved_s16le(int channels, const int16_t* pcm_data, i
 
 	static_sample_buffer* buffer = (static_sample_buffer*)tm.callbacks.allocate(tm.callbacks.udata, sizeof(buffer_t) + nsamples*channels*sizeof(float));
 	buffer->buffer.funcs = &static_sample_functions;
-	//buffer->buffer.refcnt = 1;
+	buffer->buffer.refcnt = 1;
 	buffer->nchannels = (uint8_t)channels;
 	buffer->nsamples = nsamples;
 
@@ -502,7 +514,7 @@ void tm_create_buffer_interleaved_float(int channels, const float* pcm_data, int
 
 	static_sample_buffer* buffer = (static_sample_buffer*)tm.callbacks.allocate(tm.callbacks.udata, sizeof(buffer_t) + nsamples*channels*sizeof(float));
 	buffer->buffer.funcs = &static_sample_functions;
-	//buffer->buffer.refcnt = 1;
+	buffer->buffer.refcnt = 1;
 	buffer->nchannels = (uint8_t)channels;
 	buffer->nsamples = nsamples;
 
@@ -599,9 +611,10 @@ static buffer_functions_t vorbis_stream_buffer_funcs = {
 };
 
 void tm_create_buffer_vorbis_stream(const void* data, int ndata, void* opaque, void (*closed)(void*), const tm_buffer** handle) {
+	mt_mutex_lock(&tm.lock);
 	vorbis_stream_buffer* buffer = (vorbis_stream_buffer*)tm.callbacks.allocate(tm.callbacks.udata, sizeof(vorbis_stream_buffer) + ndata);
 	buffer->buffer.funcs = &vorbis_stream_buffer_funcs;
-	//buffer->buffer.refcnt = 1;
+	buffer->buffer.refcnt = 1;
 	buffer->opaque = opaque;
 	buffer->closed = closed;
 	buffer->ndata = ndata;
@@ -609,6 +622,7 @@ void tm_create_buffer_vorbis_stream(const void* data, int ndata, void* opaque, v
 	// copy vorbis data
 	memcpy(buffer + 1, data, ndata);
 	*handle = (tm_buffer*)buffer;
+	mt_mutex_unlock(&tm.lock);
 }
 
 typedef struct {
@@ -650,36 +664,46 @@ static buffer_functions_t custom_stream_buffer_funcs = {
 };
 
 void tm_create_buffer_custom_stream(void* opaque, tm_buffer_callbacks callbacks, const tm_buffer** handle) {
-
+	mt_mutex_lock(&tm.lock);
 	custom_stream_buffer* buffer = (custom_stream_buffer*)tm.callbacks.allocate(tm.callbacks.udata, sizeof(custom_stream_buffer));
 	buffer->buffer.funcs = &custom_stream_buffer_funcs;
-	//buffer->buffer.refcnt = 1;
+	buffer->buffer.refcnt = 1;
 	buffer->opaque = opaque;
 	buffer->callbacks = callbacks;
 
 	*handle = (tm_buffer*)buffer;
+	mt_mutex_unlock(&tm.lock);
 }
 
 int tm_get_buffer_size(const tm_buffer* handle) {
+	mt_mutex_lock(&tm.lock);
 	const buffer_t* buffer = (const buffer_t*)handle;
-	return buffer->funcs->get_buffer_size(buffer);
+	int size = buffer->funcs->get_buffer_size(buffer);
+	mt_mutex_unlock(&tm.lock);
+	return size;
 }
 
 void tm_release_buffer(const tm_buffer* handle) {
+	mt_mutex_lock(&tm.lock);
 	_tm_decref((buffer_t*)handle);
+	mt_mutex_unlock(&tm.lock);
 }
 
 bool tm_add(const tm_buffer* handle, int gain_index, float gain, float pitch, tm_channel* channel) {
+    mt_mutex_lock(&tm.lock);
     source_t* source = add(handle, gain_index, gain, pitch);
     if (source) {
         play(source);
         channel->index = (int)(source - tm.sources) + 1;
+        mt_mutex_unlock(&tm.lock);
         return true;
     }
+    mt_mutex_unlock(&tm.lock);
     return false;
 }
 
 bool tm_add_spatial(const tm_buffer* handle, int gain_index, float gain, float pitch, const float* position, float distance_min, float distance_max, tm_channel* channel) {
+    mt_mutex_lock(&tm.lock);
 	source_t *source = add(handle, gain_index, gain, pitch);
 	if (source) {
 		_tm_vcopy(source->position, position);
@@ -688,9 +712,10 @@ bool tm_add_spatial(const tm_buffer* handle, int gain_index, float gain, float p
 		source->distance_difference = (distance_max - distance_min);
 		play(source);
 		channel->index = (int)(source - tm.sources) + 1;
-
+        mt_mutex_unlock(&tm.lock);
 		return true;
 	}
+    mt_mutex_unlock(&tm.lock);
 	return false;
 }
 
@@ -708,17 +733,19 @@ static source_t* _add_loop(const tm_buffer* handle, int gain_index, float gain, 
 }
 
 bool tm_add_loop(const tm_buffer* handle, int gain_index, float gain, float pitch, tm_channel* channel) {
+    mt_mutex_lock(&tm.lock);
     source_t* source = _add_loop(handle, gain_index, gain, pitch, channel);
     if (source) {
         play(source);
-
+        mt_mutex_unlock(&tm.lock);
         return true;
     }
-
+    mt_mutex_unlock(&tm.lock);
     return false;
 }
 
 bool tm_add_spatial_loop(const tm_buffer* handle, int gain_index, float gain, float pitch, const float* position, float distance_min, float distance_max, tm_channel* channel) {
+    mt_mutex_lock(&tm.lock);
 	source_t* source = _add_loop(handle, gain_index, gain, pitch, channel);
 	if (source) {
 		_tm_vcopy(source->position, position);
@@ -727,46 +754,60 @@ bool tm_add_spatial_loop(const tm_buffer* handle, int gain_index, float gain, fl
 		source->distance_difference = (distance_max - distance_min);
 
 		play(source);
-
+        mt_mutex_unlock(&tm.lock);
 		return true;
 	}
-
+    mt_mutex_unlock(&tm.lock);
 	return false;
 }
 
 void tm_channel_set_opaque(tm_channel channel, void* opaque) {
+	mt_mutex_lock(&tm.lock);
 	source_t* source = &tm.sources[channel.index - 1];
 	source->opaque = opaque;
+	mt_mutex_unlock(&tm.lock);
 }
 
 void tm_channel_stop(tm_channel channel) {
+	mt_mutex_lock(&tm.lock);
 	source_t* source = &tm.sources[channel.index - 1];
 	kill_source(source);
+	mt_mutex_unlock(&tm.lock);
 }
 
 void tm_channel_set_position(tm_channel channel, const float* position) {
+	mt_mutex_lock(&tm.lock);
 	source_t* source = &tm.sources[channel.index - 1];
 	_tm_vcopy(source->position, position);
+	mt_mutex_unlock(&tm.lock);
 }
 
 void tm_channel_fadeout(tm_channel channel, float seconds) {
+	mt_mutex_lock(&tm.lock);
 	source_t* source = &tm.sources[channel.index - 1];
 	source->fadeout_per_sample = 1.0f / (seconds * tm.sample_rate);
 	source->flags |= TM_SOURCEFLAG_FADEOUT;
+	mt_mutex_unlock(&tm.lock);
 }
 
 void tm_channel_set_gain(tm_channel channel, float gain) {
+	mt_mutex_lock(&tm.lock);
 	source_t* source = &tm.sources[channel.index - 1];
 	source->gain_base = gain;
 	source->flags &= ~TM_SOURCEFLAG_FADEOUT;
+	mt_mutex_unlock(&tm.lock);
 }
 
 float tm_channel_get_gain(tm_channel channel) {
+	mt_mutex_lock(&tm.lock);
 	source_t* source = &tm.sources[channel.index - 1];
-	return source->gain_base;
+	float g = source->gain_base;
+	mt_mutex_unlock(&tm.lock);
+	return g;
 }
 
 void tm_channel_set_frequency(tm_channel channel, float frequency) {
+	mt_mutex_lock(&tm.lock);
 	source_t* source = &tm.sources[channel.index - 1];
 
 	// clear frequency shift if ~0.0f
@@ -777,6 +818,7 @@ void tm_channel_set_frequency(tm_channel channel, float frequency) {
 		source->flags |= TM_SOURCEFLAG_FREQUENCY;
 		source->resampler.ideal_rate = frequency;
 	}
+	mt_mutex_unlock(&tm.lock);
 }
 
 static void* _tm_default_allocate(void* opaque, int bytes) {
@@ -796,6 +838,7 @@ void tm_init(tm_callbacks callbacks, int sample_rate) {
 		callbacks.free = _tm_default_free;
 	}
 
+	mt_mutex_init(&tm.lock);
 
 	tm.gain_master = 1.0f;
 	for (int ii = 0; ii < N_GAINTYPES; ++ii)
@@ -819,9 +862,11 @@ void tm_init(tm_callbacks callbacks, int sample_rate) {
 }
 
 void tm_shutdown() {
+	mt_mutex_destroy(&tm.lock);
 }
 
 void tm_update_listener(const float* position, const float* forward) {
+	mt_mutex_lock(&tm.lock);
 	_tm_vcopy(tm.position, position);
 	_tm_vcopy(tm.forward, forward);
 	// Compute right vector: cross(forward, up) where up = (0, 1, 0)
@@ -840,17 +885,23 @@ void tm_update_listener(const float* position, const float* forward) {
 		tm.right[1] = 0.0f;
 		tm.right[2] = 0.0f;
 	}
+	mt_mutex_unlock(&tm.lock);
 }
 
 void tm_set_base_gain(int index, float gain) {
+	mt_mutex_lock(&tm.lock);
 	tm.gain_base[index] = gain;
+	mt_mutex_unlock(&tm.lock);
 }
 
 void tm_set_callback_gain(float gain) {
+	mt_mutex_lock(&tm.lock);
 	tm.gain_callback = gain;
+	mt_mutex_unlock(&tm.lock);
 }
 
 void tm_effects_compressor(const float thresholds[2], const float multipliers[2], float attack_seconds, float release_seconds) {
+	mt_mutex_lock(&tm.lock);
 	tm.compressor_thresholds[0] = _tm_clamp(thresholds[0], 0.0f, 1.0f);
 	tm.compressor_thresholds[1] = _tm_clamp(thresholds[1], 0.0f, 1.0f);
 	tm.compressor_multipliers[0] = _tm_clamp(multipliers[0], 0.0f, 1.0f);
@@ -861,15 +912,18 @@ void tm_effects_compressor(const float thresholds[2], const float multipliers[2]
 
     float releaseSampleRate = (release_seconds * (float)tm.sample_rate);
 	tm.compressor_release_per1ksamples = (releaseSampleRate > 0.0f) ? (1.0f / releaseSampleRate) : 1.0f;
+	mt_mutex_unlock(&tm.lock);
 }
 
 void tm_stop_all_sources() {
+	mt_mutex_lock(&tm.lock);
 	for (int ii = 0; ii < N_SOURCES; ++ii) {
 		source_t* source = &tm.sources[ii];
 		if (source->buffer) {
 			kill_source(source);
 		}
 	}
+	mt_mutex_unlock(&tm.lock);
 }
 
 void tm_resampler_init(tm_resampler* resampler, int input_sample_rate, int output_sample_rate) {

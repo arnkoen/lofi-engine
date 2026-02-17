@@ -24,6 +24,7 @@ static struct {
     AudioContext* sfx;
     Scene* scene;
     Module mod;
+    IoMemory wasm;
     ArenaAlloc arena;
     void* tlsf_pool;
     tlsf_t tlsf;
@@ -367,6 +368,35 @@ static RTLink link[] = {
 
 #define TLSF_POOL_SIZE (32 * 1024 * 1024) // 32MB pool
 
+static void reload_game() {
+    if (ctx.mod.bytes) {
+        ctx.function = wa_sym(&ctx.mod, "lo_cleanup");
+        wa_call(&ctx.mod, ctx.function);
+        wa_free(&ctx.mod);
+    }
+    if (ctx.wasm.ptr) {
+        core_free(&ctx.allocator, ctx.wasm.ptr);
+        ctx.wasm = (IoMemory){0};
+    }
+    scene_reset(ctx.scene);
+    gfx_reset(ctx.gfx);
+    sfx_reset(ctx.sfx);
+    Result result = load_wasm(&ctx.wasm, "game.wasm");
+    if (result != RESULT_SUCCESS) {
+        LOG_ERROR("Failed to load game.wasm!\n");
+        sapp_quit();
+    }
+
+    wa_init(&ctx.mod, ctx.wasm.ptr, ctx.wasm.size, link);
+
+    ctx.function = wa_sym(&ctx.mod, "lo_init");
+    //printf("fidx %d\n\n", ctx.function);
+    StackValue ret = {0};
+    ret = wa_call(&ctx.mod, ctx.function);
+    //printf("WASM function returned: %lld (err_code %d)\n\n", ret.i64, ctx.mod.err_code);
+    ctx.function = wa_sym(&ctx.mod, "lo_frame");
+}
+
 static void init(void) {
     ctx.tlsf_pool = malloc(TLSF_POOL_SIZE);
     if (!ctx.tlsf_pool) {
@@ -411,24 +441,9 @@ static void init(void) {
     });
 
     ctx.sfx = sfx_new_context(&ctx.allocator, 32);
-
     ctx.scene = scene_new(&ctx.allocator, 512);
-    IoMemory mem = {};
-    Result result = load_wasm(&mem, "game.wasm");
-    if (result != RESULT_SUCCESS) {
-        LOG_ERROR("Failed to load game.wasm!\n");
-        sapp_quit();
-    }
 
-    wa_init(&ctx.mod, mem.ptr, mem.size, link);
-    core_free(&ctx.allocator, mem.ptr);
-
-    ctx.function = wa_sym(&ctx.mod, "lo_init");
-    //printf("fidx %d\n\n", ctx.function);
-    StackValue ret = {0};
-    ret = wa_call(&ctx.mod, ctx.function);
-    //printf("WASM function returned: %lld (err_code %d)\n\n", ret.i64, ctx.mod.err_code);
-    ctx.function = wa_sym(&ctx.mod, "lo_frame");
+    reload_game();
 }
 
 static void frame(void) {
@@ -455,6 +470,9 @@ static void event(const sapp_event* ev) {
     if(ev->type == SAPP_EVENTTYPE_KEY_DOWN && ev->key_repeat == false) {
         if (ev->key_code == SAPP_KEYCODE_F) {
             sapp_toggle_fullscreen();
+        }
+        if(ev->key_code == SAPP_KEYCODE_R) {
+            reload_game();
         }
     }
 }

@@ -957,7 +957,29 @@ void gfx_render(RenderContext* ctx, Scene* scene, Camera* cam, sg_swapchain swap
     sg_commit();
 }
 
+void gfx_reset(RenderContext* ctx) {
+    for (int i = 0; i < ctx->meshes.pool.count; i++) {
+        hp_Handle hnd = hp_handle_at(&ctx->meshes.pool, i);
+        release_model(&ctx->meshes.data[hp_index(hnd)]);
+    }
+    hp_reset(&ctx->meshes.pool);
+
+    for (int i = 0; i < ctx->textures.pool.count; i++) {
+        hp_Handle hnd = hp_handle_at(&ctx->textures.pool, i);
+        int idx = hp_index(hnd);
+        sg_destroy_image(ctx->textures.data[idx].image);
+        sg_destroy_view(ctx->textures.data[idx].view);
+    }
+    hp_reset(&ctx->textures.pool);
+
+    gfx_clear_anims(ctx);
+}
+
 void gfx_shutdown(RenderContext* ctx) {
+    arena_pop(&ctx->anims.alloc);
+    hp_reset(&ctx->anims.pool);
+    hp_reset(&ctx->meshes.pool);
+    hp_reset(&ctx->textures.pool);
     sdtx_shutdown();
     sgl_shutdown();
     sg_shutdown();
@@ -1073,6 +1095,7 @@ ModelHandle gfx_load_model(RenderContext* ctx, ArenaAlloc* alloc, const IoMemory
 void gfx_release_model(RenderContext* ctx, ModelHandle mesh) {
     int idx = hp_index(mesh.id);
     release_model(&ctx->meshes.data[idx]);
+    hp_release_handle(&ctx->meshes.pool, mesh.id);
 }
 
 TextureHandle gfx_load_texture(RenderContext* ctx, ArenaAlloc* alloc, IoMemory* data) {
@@ -1094,6 +1117,7 @@ void gfx_release_texture(RenderContext* ctx, TextureHandle tex) {
     int idx = hp_index(tex.id);
     sg_destroy_image(ctx->textures.data[idx].image);
     sg_destroy_view(ctx->textures.data[idx].view);
+    hp_release_handle(&ctx->textures.pool, tex.id);
 }
 
 AnimSetHandle gfx_load_anims(RenderContext* ctx, const IoMemory* data) {
@@ -1115,6 +1139,7 @@ void gfx_clear_anims(RenderContext* ctx) {
     arena_reset(&ctx->anims.alloc);
     hp_reset(&ctx->anims.pool);
 }
+
 
 //--IMMEDIATE-MODE-HELPERS--------------------------------------------------------------------
 
@@ -1396,9 +1421,17 @@ SoundBufferHandle sfx_load_buffer(AudioContext* ctx, IoMemory* data) {
 void sfx_release_buffer(AudioContext* ctx, SoundBufferHandle buf) {
     int idx = hp_index(buf.id);
     tm_release_buffer(ctx->buffers.data[idx]);
+    hp_release_handle(&ctx->buffers.pool, buf.id);
 }
 
-
+void sfx_reset(AudioContext* ctx) {
+    tm_stop_all_sources();
+    for (int i = 0; i < ctx->buffers.pool.count; i++) {
+        hp_Handle hnd = hp_handle_at(&ctx->buffers.pool, i);
+        tm_release_buffer(ctx->buffers.data[hp_index(hnd)]);
+    }
+    hp_reset(&ctx->buffers.pool);
+}
 
 
 //--SCENE------------------------------------------------------------------------------------
@@ -1476,6 +1509,37 @@ Scene* scene_new(Allocator* alloc, uint16_t max_things) {
     }
 
     return t;
+}
+
+void scene_reset(Scene* scene) {
+    if (!scene) return;
+    int cap = scene->pool.capacity;
+
+    hp_reset(&scene->pool);
+
+    memset(scene->relation_flags, 0, cap * sizeof(RelationFlags));
+    memset(scene->parents, 0, cap * sizeof(Entity));
+    memset(scene->childs, 0, cap * sizeof(Children));
+    memset(scene->model_flags, 0, cap * sizeof(ModelFlags));
+    memset(scene->models, 0, cap * sizeof(ModelHandle));
+    memset(scene->textures, 0, cap * sizeof(TextureSet));
+    memset(scene->anim_flags, 0, cap * sizeof(AnimFlags));
+    memset(scene->anims, 0, cap * sizeof(AnimSetHandle));
+    memset(scene->anim_states, 0, cap * sizeof(AnimState));
+    memset(scene->prev_anim_states, 0, cap * sizeof(AnimState));
+    for (int i = 0; i < cap; i++) {
+        scene->anim_blend_weights[i] = 1.0f;
+    }
+    memset(scene->sound_flags, 0, cap * sizeof(SoundFlags));
+    memset(scene->sound_buffers, 0, cap * sizeof(SoundBufferHandle));
+    memset(scene->sound_channels, 0, cap * sizeof(tm_channel));
+    memset(scene->sound_props, 0, cap * sizeof(SoundProps));
+
+    for (int i = 0; i < cap; i++) {
+        scene->transforms[i].pos = HMM_V3(0, 0, 0);
+        scene->transforms[i].scale = HMM_V3(1, 1, 1);
+        scene->transforms[i].rot = HMM_Q(0, 0, 0, 1);
+    }
 }
 
 void scene_destroy(Allocator* alloc, Scene* scene) {
