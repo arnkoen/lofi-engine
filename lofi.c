@@ -448,7 +448,7 @@ sapp_desc sokol_main(int argc, char* argv[]) {
         .event_cb = event,
         .width = 1280,
         .height = 720,
-        .window_title = "TITLE",
+        .window_title = "LOFI",
         .swap_interval = 1,
         .icon.sokol_default = true,
         .win32_console_attach = true,

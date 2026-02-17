@@ -15,7 +15,7 @@ lo_init :: proc "c" () {
 	set_texture(ent, tex_head, 1)
 	desc := Anim_Desc {
 		set   = anims,
-		anim  = 1,
+		anim  = 2,
 		flags = ANIM_FLAG_LOOP | ANIM_FLAG_PLAY,
 	}
 	set_anims(ent, &desc)

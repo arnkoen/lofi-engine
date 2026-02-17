@@ -14,7 +14,7 @@ export fn lo_init() void {
     lo.setTexture(ent, tex_head, 1);
     lo.setAnims(ent, &lo.AnimDesc{
         .set = anims,
-        .anim = 1,
+        .anim = 0,
         .flags = lo.ANIM_FLAG_LOOP | lo.ANIM_FLAG_PLAY,
     });
     const snd = lo.loadSound("assets/loop.ogg");
