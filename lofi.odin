@@ -21,9 +21,8 @@ Sound :: struct {
 }
 
 // Flags
-ANIM_FLAG_NONE :: 0
-ANIM_FLAG_PLAY :: 1 << 0
-ANIM_FLAG_LOOP :: 1 << 1
+ANIM_PLAY :: 1 << 0
+ANIM_LOOP :: 1 << 1
 
 SOUND_PLAY :: 1 << 1
 SOUND_LOOP :: 1 << 2

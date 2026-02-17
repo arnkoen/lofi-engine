@@ -10,9 +10,8 @@
 #define IMPORT(name)
 #endif
 
-#define ANIM_FLAG_NONE (0)
-#define ANIM_FLAG_PLAY (1 << 0)
-#define ANIM_FLAG_LOOP (1 << 1)
+#define ANIM_PLAY (1 << 0)
+#define ANIM_LOOP (1 << 1)
 
 #define SOUND_PLAY    (1U << 1)
 #define SOUND_LOOP    (1U << 2)

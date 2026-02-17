@@ -16,7 +16,7 @@ lo_init :: proc "c" () {
 	desc := Anim_Desc {
 		set   = anims,
 		anim  = 2,
-		flags = ANIM_FLAG_LOOP | ANIM_FLAG_PLAY,
+		flags = ANIM_LOOP | ANIM_PLAY,
 	}
 	set_anims(ent, &desc)
 	snd := load_sound("assets/loop.ogg")

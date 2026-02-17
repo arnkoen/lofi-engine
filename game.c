@@ -17,7 +17,7 @@ void lo_init() {
     lo_set_anims(ent, &(lo_AnimDesc) {
         .set = anims,
         .anim = 1,
-        .flags = ANIM_FLAG_LOOP | ANIM_FLAG_PLAY,
+        .flags = ANIM_LOOP | ANIM_PLAY,
     });
     lo_Sound snd = lo_load_sound(ASSET"loop.ogg");
     lo_set_sound(ent, &(lo_SoundDesc) {

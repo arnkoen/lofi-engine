@@ -4,9 +4,8 @@ pub const Model = packed struct { id: u32 = 0 };
 pub const AnimSet = packed struct { id: u32 = 0 };
 pub const Sound = packed struct { id: u32 = 0 };
 
-pub const ANIM_FLAG_NONE: i32 = 0;
-pub const ANIM_FLAG_PLAY: i32 = 1 << 0;
-pub const ANIM_FLAG_LOOP: i32 = 1 << 1;
+pub const ANIM_PLAY: i32 = 1 << 0;
+pub const ANIM_LOOP: i32 = 1 << 1;
 
 pub const SOUND_PLAY: u32 = 1 << 1;
 pub const SOUND_LOOP: u32 = 1 << 2;
