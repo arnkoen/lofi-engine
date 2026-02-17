@@ -1544,28 +1544,28 @@ static int wa_interpret(Module *m) {
         case 0xad: stack[m->sp].u64 = stack[m->sp].u32; break;      /* i64.extend_i32_u */
 #ifndef WA_NOFLOAT
         case 0xa8: if(__builtin_isnan(stack[m->sp].f32)) { ERR(("wa_interpret: invalid int conversion")); m->err_code = WA_ERR_ARITH; return 0; }
-            else if(stack[m->sp].f32 >= INT32_MAX || stack[m->sp].f32 < INT32_MIN) { ERR(("wa_interpret: int overflow")); m->err_code = WA_ERR_ARITH; return 0; }
+            else if(stack[m->sp].f32 >= (float)INT32_MAX || stack[m->sp].f32 < INT32_MIN) { ERR(("wa_interpret: int overflow")); m->err_code = WA_ERR_ARITH; return 0; }
                    stack[m->sp].i32 = stack[m->sp].f32; break;      /* i32.trunc_f32_s */
         case 0xa9: if(__builtin_isnan(stack[m->sp].f32)) { ERR(("wa_interpret: invalid int conversion")); m->err_code = WA_ERR_ARITH; return 0; }
-            else if(stack[m->sp].f32 >= UINT32_MAX || stack[m->sp].f32 <= -1) { ERR(("wa_interpret: int overflow")); m->err_code = WA_ERR_ARITH; return 0; }
+            else if(stack[m->sp].f32 >= (float)UINT32_MAX || stack[m->sp].f32 <= -1) { ERR(("wa_interpret: int overflow")); m->err_code = WA_ERR_ARITH; return 0; }
                    stack[m->sp].u32 = stack[m->sp].f32; break;      /* i32.trunc_f32_u */
         case 0xaa: if(__builtin_isnan(stack[m->sp].f64)) { ERR(("wa_interpret: invalid int conversion")); m->err_code = WA_ERR_ARITH; return 0; }
-            else if(stack[m->sp].f64 > INT32_MAX || stack[m->sp].f64 < INT32_MIN) { ERR(("wa_interpret: int overflow")); m->err_code = WA_ERR_ARITH; return 0; }
+            else if(stack[m->sp].f64 > (double)INT32_MAX || stack[m->sp].f64 < INT32_MIN) { ERR(("wa_interpret: int overflow")); m->err_code = WA_ERR_ARITH; return 0; }
                    stack[m->sp].i32 = stack[m->sp].f64; break;      /* i32.trunc_f64_s */
         case 0xab: if(__builtin_isnan(stack[m->sp].f64)) { ERR(("wa_interpret: invalid int conversion")); m->err_code = WA_ERR_ARITH; return 0; }
-            else if(stack[m->sp].f64 > UINT32_MAX || stack[m->sp].f64 <= -1) { ERR(("wa_interpret: int overflow")); m->err_code = WA_ERR_ARITH; return 0; }
+            else if(stack[m->sp].f64 > (double)UINT32_MAX || stack[m->sp].f64 <= -1) { ERR(("wa_interpret: int overflow")); m->err_code = WA_ERR_ARITH; return 0; }
                    stack[m->sp].u32 = stack[m->sp].f64; break;      /* i32.trunc_f64_u */
         case 0xae: if(__builtin_isnan(stack[m->sp].f32)) { ERR(("wa_interpret: invalid int conversion")); m->err_code = WA_ERR_ARITH; return 0; }
-            else if(stack[m->sp].f32 >= INT64_MAX || stack[m->sp].f32 < INT64_MIN) { ERR(("wa_interpret: int overflow")); m->err_code = WA_ERR_ARITH; return 0; }
+            else if(stack[m->sp].f32 >= (float)INT64_MAX || stack[m->sp].f32 < INT64_MIN) { ERR(("wa_interpret: int overflow")); m->err_code = WA_ERR_ARITH; return 0; }
                    stack[m->sp].i64 = stack[m->sp].f32; break;      /* i64.trunc_f32_s */
         case 0xaf: if(__builtin_isnan(stack[m->sp].f32)) { ERR(("wa_interpret: invalid int conversion")); m->err_code = WA_ERR_ARITH; return 0; }
-            else if(stack[m->sp].f32 >= UINT64_MAX || stack[m->sp].f32 <= -1) { ERR(("wa_interpret: int overflow")); m->err_code = WA_ERR_ARITH; return 0; }
+            else if(stack[m->sp].f32 >= (double)UINT64_MAX || stack[m->sp].f32 <= -1) { ERR(("wa_interpret: int overflow")); m->err_code = WA_ERR_ARITH; return 0; }
                    stack[m->sp].u64 = stack[m->sp].f32; break;      /* i64.trunc_f32_u */
         case 0xb0: if(__builtin_isnan(stack[m->sp].f64)) { ERR(("wa_interpret: invalid int conversion")); m->err_code = WA_ERR_ARITH; return 0; }
-            else if(stack[m->sp].f64 >= INT64_MAX || stack[m->sp].f64 < INT64_MIN) { ERR(("wa_interpret: int overflow")); m->err_code = WA_ERR_ARITH; return 0; }
+            else if(stack[m->sp].f64 >= (double)INT64_MAX || stack[m->sp].f64 < INT64_MIN) { ERR(("wa_interpret: int overflow")); m->err_code = WA_ERR_ARITH; return 0; }
                    stack[m->sp].i64 = stack[m->sp].f64; break;      /* i64.trunc_f64_s */
         case 0xb1: if(__builtin_isnan(stack[m->sp].f64)) { ERR(("wa_interpret: invalid int conversion")); m->err_code = WA_ERR_ARITH; return 0; }
-            else if(stack[m->sp].f64 >= UINT64_MAX || stack[m->sp].f64 <= -1) { ERR(("wa_interpret: int overflow")); m->err_code = WA_ERR_ARITH; return 0; }
+            else if(stack[m->sp].f64 >= (double)UINT64_MAX || stack[m->sp].f64 <= -1) { ERR(("wa_interpret: int overflow")); m->err_code = WA_ERR_ARITH; return 0; }
                    stack[m->sp].u64 = stack[m->sp].f64; break;      /* i64.trunc_f64_u */
         case 0xb2: stack[m->sp].f32 = stack[m->sp].i32; break;      /* f32.convert_i32_s */
         case 0xb3: stack[m->sp].f32 = stack[m->sp].u32; break;      /* f32.convert_i32_u */

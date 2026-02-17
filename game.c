@@ -45,7 +45,7 @@ void lo_frame(float dt) {
     });
     lo_set_cam_target((float[]){ 0, 0.75f, 0 });
 
-    lo_dtx_canvas(800.0f, 600.0f);
+    lo_dtx_canvas(800.0f * 0.5f, 600.0f * 0.5f);
     lo_dtx_origin(1.0f, 1.0f);
     lo_dtx_color3b(255, 255, 255);
     lo_dtx_puts("Hello Lofi");

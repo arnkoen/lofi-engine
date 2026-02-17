@@ -40,11 +40,6 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <stdint.h>
 #include <stdbool.h>
 
-#if !defined(HP_MALLOC) || !defined(HP_FREE)
-#include <stdlib.h>
-#define HP_MALLOC(x) malloc(x)
-#define HP_FREE(x) free(x)
-#endif
 #if !defined(HP_ASSERT)
 #include <assert.h>
 #define HP_ASSERT(x) assert(x)
