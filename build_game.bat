@@ -1,0 +1,1 @@
+clang --target=wasm32 -mcpu=mvp -Oz -flto -fno-exceptions -fno-rtti -ffunction-sections -fdata-sections -nostdlib -Wl,--no-entry -Wl,--export-all -Wl,--allow-undefined -Wl,--gc-sections -Wl,--strip-all -Wl,--lto-O3 -o game.wasm game.c

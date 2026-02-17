@@ -1,0 +1,1 @@
+clang core.c lofi.c deps/headers.c deps/tmixer.c deps/tlsf.c deps/dds-ktx.c -O2 -flto -ffunction-sections -fdata-sections -fno-exceptions -fno-rtti -ffast-math -DNDEBUG -D_CRT_SECURE_NO_WARNINGS -fuse-ld=lld -Wl,/OPT:REF -Wl,/OPT:ICF -o lofi.exe
