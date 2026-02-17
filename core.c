@@ -957,13 +957,6 @@ void gfx_render(RenderContext* ctx, Scene* scene, Camera* cam, sg_swapchain swap
     sg_commit();
 }
 
-void gfx_event(RenderContext* ctx, const sapp_event* e) {
-    assert(ctx && e);
-    if (e->type == SAPP_EVENTTYPE_MOUSE_MOVE) {
-        ctx->display.mouse_pos = HMM_V2(e->mouse_x, e->mouse_y);
-    }
-}
-
 void gfx_shutdown(RenderContext* ctx) {
     sdtx_shutdown();
     sgl_shutdown();

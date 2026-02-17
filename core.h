@@ -218,14 +218,11 @@ typedef struct RenderContext {
         sg_pass_action action;
         sg_pipeline pip;
         sg_bindings rect;
-        HMM_Vec2 mouse_pos;
     } display;
-    bool draw_physics;
 } RenderContext;
 
 RenderContext* gfx_new_context(Allocator* alloc, const RenderContextDesc* desc);
 void gfx_render(RenderContext* gfx, Scene* scene, Camera* cam, sg_swapchain swapchain, float dt);
-void gfx_event(RenderContext* gfx, const sapp_event* e);
 void gfx_shutdown(RenderContext* gfx);
 void gfx_load_cubemap(RenderContext* ctx, ArenaAlloc* alloc, IoMemory* mem);
 

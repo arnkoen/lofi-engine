@@ -407,10 +407,10 @@ static void init(void) {
     core_free(&ctx.allocator, mem.ptr);
 
     ctx.function = wa_sym(&ctx.mod, "lo_init");
-    printf("fidx %d\n\n", ctx.function);
+    //printf("fidx %d\n\n", ctx.function);
     StackValue ret = {0};
     ret = wa_call(&ctx.mod, ctx.function);
-    printf("WASM function returned: %lld (err_code %d)\n\n", ret.i64, ctx.mod.err_code);
+    //printf("WASM function returned: %lld (err_code %d)\n\n", ret.i64, ctx.mod.err_code);
     ctx.function = wa_sym(&ctx.mod, "lo_frame");
 }
 
