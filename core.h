@@ -26,6 +26,7 @@ typedef struct Entity { hp_Handle id; } Entity;
 
 //--LOG---------------------------------------------------------------------------------------
 
+//https://github.com/r-lyeh/tinybits/blob/master/tinylog.c
 #ifdef _WIN32
 #define ANSI(code) ""
 #else
