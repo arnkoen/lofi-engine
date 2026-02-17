@@ -427,6 +427,9 @@ static void frame(void) {
 }
 
 static void cleanup(void) {
+    ctx.function = wa_sym(&ctx.mod, "lo_cleanup");
+    wa_call(&ctx.mod, ctx.function);
+    wa_free(&ctx.mod);
     sfx_shutdown(ctx.sfx);
     gfx_shutdown(ctx.gfx);
 }
