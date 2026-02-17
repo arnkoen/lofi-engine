@@ -61,12 +61,6 @@ typedef struct {
     size_t size;
 } IoMemory;
 
-#ifndef __cplusplus
-#define KIT_IoMemory(x) ((kit_IoMemory){&x, sizeof(x)})
-#else
-#define KIT_IoMemory(x) (kit_IoMemory{&x, sizeof(x)})
-#endif
-
 typedef uint16_t Result;
 
 enum {
