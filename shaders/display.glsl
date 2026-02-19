@@ -54,7 +54,7 @@ out vec4 frag_color;
 
 void main() {
     vec2 uv = v_uv;
-#if SOKOL_HLSL
+#if SOKOL_HLSL || SOKOL_WGSL
     uv.y = 1.0 - uv.y;
 #endif
     vec4 col = texture(sampler2D(tex, smp), uv);

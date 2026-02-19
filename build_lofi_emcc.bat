@@ -1,0 +1,1 @@
+emcc core.c lofi.c deps/headers.c deps/tmixer.c deps/tlsf.c deps/dds-ktx.c deps/ne.cc -fno-exceptions -fno-rtti -Oz -s USE_WEBGL2=1 -sALLOW_MEMORY_GROWTH=1 --preload-file game.wasm --preload-file assets --shell-file shell.html -o lofi.html

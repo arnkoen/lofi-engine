@@ -6,6 +6,7 @@
 #include "deps/sokol_audio.h"
 #include "deps/sokol_log.h"
 #include "deps/dds-ktx.h"
+#include "deps/tiny_webp.h"
 #include "deps/iqm.h"
 #include "deps/tinyendian.c"
 #include "deps/tmixer.h"
@@ -141,6 +142,31 @@ sg_image_type dds_to_sg_image_type(unsigned int flags) {
 }
 
 Result load_texture(ArenaAlloc* alloc, Texture* out, const IoMemory* mem) {
+    //webp magic is "RIFF" at [0] and "WEBP" at [8]
+    if (mem->size >= 12 &&
+        memcmp(mem->ptr,     "RIFF", 4) == 0 &&
+        memcmp(mem->ptr + 8, "WEBP", 4) == 0) {
+        int width, height;
+        unsigned char* rgba = twp_read_from_memory(
+            (void*)mem->ptr, (int)mem->size, &width, &height, twp_FORMAT_RGBA, 0);
+        if (!rgba) {
+            LOG_ERROR("Failed to decode WebP texture\n");
+            return RESULT_UNKNOWN_ERROR;
+        }
+        sg_image_desc desc = {
+            .width = width,
+            .height = height,
+            .pixel_format = SG_PIXELFORMAT_RGBA8,
+            .data.mip_levels[0] = (sg_range){ rgba, (size_t)(width * height * 4) },
+        };
+        out->image = sg_make_image(&desc);
+        free(rgba);
+        out->view = sg_make_view(&(sg_view_desc){
+            .texture = out->image,
+        });
+        return RESULT_SUCCESS;
+    }
+
     ddsktx_texture_info tc = {0};
     if (ddsktx_parse(&tc, (const void*)mem->ptr, (int)mem->size, NULL)) {
         sg_image_desc desc = {0};
@@ -158,6 +184,10 @@ Result load_texture(ArenaAlloc* alloc, Texture* out, const IoMemory* mem) {
             assert(ptr);
             memcpy(ptr, sub_data.buff, sub_data.size_bytes);
             desc.data.mip_levels[mip] = (sg_range){ptr, sub_data.size_bytes};
+        }
+        if (desc.pixel_format != SG_PIXELFORMAT_NONE && !sg_query_pixelformat(desc.pixel_format).sample) {
+            LOG_ERROR("Pixel format %d not supported by GPU (compressed texture not available?)\n", desc.pixel_format);
+            return RESULT_UNKNOWN_ERROR;
         }
         out->image = sg_make_image(&desc);
         out->view = sg_make_view(&(sg_view_desc) {

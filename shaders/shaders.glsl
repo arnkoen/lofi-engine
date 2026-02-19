@@ -80,12 +80,29 @@ layout(binding=1) uniform u_skeleton {
     mat4 bones[MAX_BONES];
 };
 
+//SOKOL_GLES3 does not seem to do the trick(?)
+#ifdef SOKOL_GLSL
+mat4 get_bone(int index) {
+    for (int i = 0; i < MAX_BONES; i++) {
+        if (i == index) return bones[i];
+    }
+    return mat4(1.0);
+}
+#endif
+
 void main() {
+#ifdef SOKOL_GLSL
+    mat4 skin_mat = weights.x * get_bone(int(bone_indices.x)) +
+                    weights.y * get_bone(int(bone_indices.y)) +
+                    weights.z * get_bone(int(bone_indices.z)) +
+                    weights.w * get_bone(int(bone_indices.w));
+#else
     uvec4 idx = bone_indices;
     mat4 skin_mat = weights.x * bones[idx.x] +
                     weights.y * bones[idx.y] +
                     weights.z * bones[idx.z] +
                     weights.w * bones[idx.w];
+#endif
 
     vec4 skinned_pos = skin_mat * vec4(position, 1.0);
     vec3 skinned_nrm = mat3(skin_mat) * normal;

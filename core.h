@@ -172,7 +172,6 @@ typedef struct AnimState {
 
 typedef struct RenderContextDesc {
     sg_environment environment;
-    sg_swapchain swapchain;
     int width, height;
     size_t max_anim_data;
     uint16_t max_anim_sets;

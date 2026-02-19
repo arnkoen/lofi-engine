@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>LOFI</title>
+        <style>
+            * {
+                box-sizing: border-box;
+                margin: 0;
+                padding: 0;
+            }
+            html,
+            body {
+                width: 100%;
+                height: 100%;
+                background: #111;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+            }
+            #canvas {
+                display: block;
+            }
+            #status {
+                margin-top: 12px;
+                min-height: 1em;
+            }
+        </style>
+    </head>
+    <body>
+        <canvas
+            id="canvas"
+            oncontextmenu="event.preventDefault()"
+            tabindex="-1"
+        ></canvas>
+        <div id="status">loading...</div>
+
+        <script>
+            var statusEl = document.getElementById("status");
+            var Module = {
+                canvas: document.getElementById("canvas"),
+                print: function () {
+                    console.log.apply(console, arguments);
+                },
+                printErr: function () {
+                    console.error.apply(console, arguments);
+                },
+                setStatus: function (text) {
+                    statusEl.textContent = text;
+                    if (!text) statusEl.style.display = "none";
+                },
+                monitorRunDependencies: function (left) {
+                    if (left === 0) Module.setStatus("");
+                },
+            };
+            window.onerror = function (msg) {
+                Module.setStatus("error: " + msg);
+            };
+        </script>
+        {{{ SCRIPT }}}
+    </body>
+</html>

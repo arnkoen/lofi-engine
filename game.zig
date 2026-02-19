@@ -108,9 +108,9 @@ fn player_update(dt: f32) void {
 export fn lo_init() void {
     model = lo.loadModel("assets/game_base.iqm");
     anims = lo.loadAnims("assets/game_base.iqm");
-    tex_body = lo.loadTexture("assets/skin_body.dds");
-    tex_head = lo.loadTexture("assets/skin_head.dds");
-    tex_checker = lo.loadTexture("assets/floor.dds");
+    tex_body = lo.loadTexture("assets/skin_body.webp");
+    tex_head = lo.loadTexture("assets/skin_head.webp");
+    tex_checker = lo.loadTexture("assets/floor.webp");
     floor_model = lo.loadModel("assets/plane.iqm");
     cube_model = lo.loadModel("assets/cube.iqm");
     snd = lo.loadSound("assets/loop.ogg");

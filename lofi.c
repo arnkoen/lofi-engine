@@ -2,7 +2,13 @@
 #include "deps/ne.h"
 #include "lofi.h"
 #define SOKOL_IMPL
+#ifdef __EMSCRIPTEN__
+#define SOKOL_GLES3
+#elif defined(_WIN32)
+#define SOKOL_D3D11
+#else
 #define SOKOL_GLCORE
+#endif
 #include "deps/sokol_app.h"
 #include "deps/sokol_gfx.h"
 #include "deps/sokol_glue.h"
@@ -462,7 +468,6 @@ static RTLink link[] = {
     { 0 }
 };
 
-#define TLSF_POOL_SIZE (32 * 1024 * 1024) // 32MB pool
 
 static void reload_game() {
     if (ctx.mod.bytes) {
@@ -502,6 +507,8 @@ static void reload_game() {
     ctx.fn_mouse_button = wa_sym(&ctx.mod, "lo_mouse_button");
     ctx.fn_key = wa_sym(&ctx.mod, "lo_key");
 }
+
+#define TLSF_POOL_SIZE (32 * 1024 * 1024) // 32MB pool
 
 static void init(void) {
     ctx.tlsf_pool = malloc(TLSF_POOL_SIZE);
@@ -543,7 +550,6 @@ static void init(void) {
 
     ctx.gfx = gfx_new_context(&ctx.allocator, &(RenderContextDesc) {
         .environment = sglue_environment(),
-        .swapchain = sglue_swapchain(),
         .max_anim_data = (1024 * 1024),
         .max_anim_sets = 32,
         .max_meshes = 32,
@@ -551,11 +557,7 @@ static void init(void) {
         .width = 800,
         .height = 600,
     });
-
     ctx.sfx = sfx_new_context(&ctx.allocator, 32);
-
-
-
     ctx.scene = scene_new(&ctx.allocator, 512);
 
     reload_game();
@@ -630,6 +632,7 @@ sapp_desc sokol_main(int argc, char* argv[]) {
         .swap_interval = 1,
         .sample_count = 1,
         .icon.sokol_default = true,
-        .win32_console_attach = true,
+        .win32.console_attach = true,
+        .html5.canvas_resize = true,
     };
 }
