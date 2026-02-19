@@ -67,11 +67,42 @@ IMPORT(lo_play_sound) void lo_play_sound(lo_Entity e);
 IMPORT(lo_stop_sound) void lo_stop_sound(lo_Entity e);
 IMPORT(lo_clear_sound) void lo_clear_sound(lo_Entity e);
 
-IMPORT(lo_sinf) float lo_sinf(float x);
-IMPORT(lo_cosf) float lo_cosf(float x);
+typedef struct { uint64_t ptr; } lo_RigidBody;
+typedef struct { uint64_t ptr; } lo_AnimBody;
+
+IMPORT(lo_create_rigid_body)      lo_RigidBody lo_create_rigid_body(void);
+IMPORT(lo_free_rigid_body)        void         lo_free_rigid_body(lo_RigidBody body);
+IMPORT(lo_set_rigid_body)         void         lo_set_rigid_body(lo_Entity e, lo_RigidBody body);
+IMPORT(lo_clear_rigid_body)       void         lo_clear_rigid_body(lo_Entity e);
+IMPORT(lo_create_anim_body)       lo_AnimBody  lo_create_anim_body(void);
+IMPORT(lo_free_anim_body)         void         lo_free_anim_body(lo_AnimBody body);
+IMPORT(lo_set_anim_body)          void         lo_set_anim_body(lo_Entity e, lo_AnimBody body);
+IMPORT(lo_clear_anim_body)        void         lo_clear_anim_body(lo_Entity e);
+
+#define LO_GEOM_BOX      0
+#define LO_GEOM_SPHERE   1
+#define LO_GEOM_CYLINDER 2
+
+typedef struct {
+    int32_t type;
+    float   pos[3];
+    float   rot[4];
+    float   size[3]; // box: w,h,d; sphere: diameter; cylinder: diameter, height
+} lo_GeomDesc;
+
+IMPORT(lo_rb_add_geom)            void lo_rb_add_geom(lo_RigidBody body, lo_GeomDesc* desc);
+IMPORT(lo_ab_add_geom)            void lo_ab_add_geom(lo_AnimBody body, lo_GeomDesc* desc);
+
+IMPORT(lo_rb_set_pos)             void lo_rb_set_pos(lo_RigidBody body, float pos[3]);
+IMPORT(lo_rb_set_rot)             void lo_rb_set_rot(lo_RigidBody body, float rot[4]);
+IMPORT(lo_ab_set_pos)             void lo_ab_set_pos(lo_AnimBody body, float pos[3]);
+IMPORT(lo_ab_set_rot)             void lo_ab_set_rot(lo_AnimBody body, float rot[4]);
+
+IMPORT(lo_rb_set_mass)            void lo_rb_set_mass(lo_RigidBody body, float mass);
 
 IMPORT(lo_set_campos) void lo_set_campos(float pos[3]);
 IMPORT(lo_set_cam_target) void lo_set_cam_target(float target[3]);
+IMPORT(lo_lock_mouse) void lo_lock_mouse(bool lock);
 
 IMPORT(lo_dtx_layer) void lo_dtx_layer(int layer_id);
 IMPORT(lo_dtx_font) void lo_dtx_font(int font_index);

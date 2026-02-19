@@ -10,6 +10,7 @@
 #include "deps/sokol_gl.h"
 #include "shaders/display.glsl.h"
 #include "shaders/shaders.glsl.h"
+#include "deps/ne.h"
 #include "deps/tmixer.h"
 #include "deps/handle_pool.h"
 #include "deps/arena.h"
@@ -289,6 +290,10 @@ typedef struct SoundBufferHandle { hp_Handle id; } SoundBufferHandle;
 SoundBufferHandle sfx_load_buffer(AudioContext* ctx, IoMemory* data);
 void sfx_release_buffer(AudioContext* sfx, SoundBufferHandle buf);
 
+//--PHYSICS--------------------------------
+
+void ne_update(ne_Simulator sim, Scene* scene, float dt);
+
 
 //--ENTITY---------------------------------
 
@@ -306,8 +311,17 @@ void sfx_release_buffer(AudioContext* sfx, SoundBufferHandle buf);
 #define ENTITY_SOUND_SPATIAL (1U << 3)
 #define ENTITY_SOUND_PLAYING (1U << 4)
 
+#define ENTITY_HAS_PHYSICS   (1U << 0)
+#define ENTITY_HAS_RIGIDBODY (1U << 1)
+#define ENTITY_HAS_ANIMBODY  (1U << 2)
+
 #define ENTITY_MAX_CHILDREN 8
 
+typedef uint16_t RelationFlags;
+typedef uint16_t ModelFlags;
+typedef uint16_t AnimFlags;
+typedef uint16_t SoundFlags;
+typedef uint16_t PhysicsFlags;
 
 typedef struct {
     Entity data[ENTITY_MAX_CHILDREN];
@@ -317,10 +331,10 @@ typedef struct {
     TextureHandle tex[4];
 } TextureSet;
 
-typedef uint16_t RelationFlags;
-typedef uint16_t ModelFlags;
-typedef uint16_t AnimFlags;
-typedef uint16_t SoundFlags;
+typedef union {
+    ne_RigidBody rigid;
+    ne_AnimBody anim;
+} PhysicsBody;
 
 typedef struct Scene {
     hp_Pool pool;
@@ -344,6 +358,9 @@ typedef struct Scene {
     SoundBufferHandle* sound_buffers;
     SoundChannel* sound_channels;
     SoundProps* sound_props;
+
+    PhysicsFlags* physics_flags;
+    PhysicsBody* physics_bodies;
 } Scene;
 
 Scene* scene_new(Allocator* alloc, uint16_t max_things);
@@ -380,6 +397,11 @@ void entity_set_sound(Scene* scene, Entity e, SoundBufferHandle buffer, SoundPro
 void entity_play_sound(Scene* scene, Entity e);
 void entity_stop_sound(Scene* scene, Entity e);
 void entity_clear_sound(Scene* scene, Entity e);
+
+void entity_set_rigid_body(Scene* scene, Entity e, ne_RigidBody body);
+void entity_clear_rigid_body(Scene* scene, ne_Simulator sim, Entity e);
+void entity_set_animated_body(Scene* scene, Entity e, ne_AnimBody body);
+void entity_clear_animated_body(Scene* scene, ne_Simulator sim, Entity e);
 
 
 #ifdef __cplusplus

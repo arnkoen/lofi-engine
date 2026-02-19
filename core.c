@@ -1,4 +1,5 @@
 #include "core.h"
+#include "deps/ne.h"
 #include "deps/sokol_app.h"
 #include "deps/sokol_gl.h"
 #include "deps/sokol_debugtext.h"
@@ -1380,7 +1381,7 @@ void sfx_update(AudioContext* ctx, HMM_Vec3 listener_pos, HMM_Vec3 listener_forw
             tm_channel_set_position(channel, audio_pos);
         }
 
-        if ((flags & ENTITY_SOUND_PLAYING) && !tm_channel_isvalid(scene->sound_channels[idx]) && !(flags & ENTITY_SOUND_LOOP)) {
+        if ((flags & ENTITY_SOUND_PLAYING) && !tm_channel_isplaying(scene->sound_channels[idx]) && !(flags & ENTITY_SOUND_LOOP)) {
             scene->sound_flags[idx] &= ~(ENTITY_SOUND_PLAYING | ENTITY_SOUND_PLAY);
             scene->sound_channels[idx] = (tm_channel){0};
         }
@@ -1431,6 +1432,41 @@ void sfx_release_buffer(AudioContext* ctx, SoundBufferHandle buf) {
     int idx = hp_index(buf.id);
     tm_release_buffer(ctx->buffers.data[idx]);
     hp_release_handle(&ctx->buffers.pool, buf.id);
+}
+
+
+//--PHYSICS----------------------------------------------------------------------------------
+
+void ne_update(ne_Simulator sim, Scene* scene, float dt) {
+    if (!sim || !scene) return;
+    Transform* trs = scene->transforms;
+    PhysicsFlags* flags = scene->physics_flags;
+    PhysicsBody* bodies = scene->physics_bodies;
+
+    // Sync animated body positions BEFORE physics simulation
+    // so collision detection uses current entity positions
+    for (int i = 0; i < scene->pool.count; i++) {
+        Entity handle = { .id = hp_handle_at(&scene->pool, i) };
+        int idx = hp_index(handle.id);
+
+        if (flags[idx] & ENTITY_HAS_ANIMBODY) {
+            ne_anim_body_set_pos(bodies[idx].anim, trs[idx].pos);
+            ne_anim_body_set_rot(bodies[idx].anim, trs[idx].rot);
+        }
+    }
+
+    ne_sim_advance(sim, dt, 4);
+
+    // Sync rigid body transforms back to entities after simulation
+    for (int i = 0; i < scene->pool.count; i++) {
+        Entity handle = { .id = hp_handle_at(&scene->pool, i) };
+        int idx = hp_index(handle.id);
+
+        if (flags[idx] & ENTITY_HAS_RIGIDBODY) {
+            scene->transforms[idx].pos = ne_rigid_body_get_pos(bodies[idx].rigid);
+            scene->transforms[idx].rot = ne_rigid_body_get_rot(bodies[idx].rigid);
+        }
+    }
 }
 
 
@@ -1485,6 +1521,11 @@ Scene* scene_new(Allocator* alloc, uint16_t max_things) {
     t->sound_props = core_alloc(alloc, max_things * sizeof(SoundProps), alignof(SoundProps));
     if (!t->sound_props) return NULL;
 
+    t->physics_flags = core_alloc(alloc, max_things * sizeof(PhysicsFlags), alignof(PhysicsFlags));
+    if (!t->physics_flags) return NULL;
+    t->physics_bodies = core_alloc(alloc, max_things * sizeof(PhysicsBody), alignof(PhysicsBody));
+    if(!t->physics_bodies) return NULL;
+
     memset(t->relation_flags, 0, max_things * sizeof(RelationFlags));
     memset(t->parents, 0, max_things * sizeof(Entity));
     memset(t->childs, 0, max_things * sizeof(Children));
@@ -1501,6 +1542,8 @@ Scene* scene_new(Allocator* alloc, uint16_t max_things) {
     memset(t->sound_buffers, 0, max_things * sizeof(SoundBufferHandle));
     memset(t->sound_channels, 0, max_things * sizeof(tm_channel));
     memset(t->sound_props, 0, max_things * sizeof(SoundProps));
+    memset(t->physics_flags, 0, max_things * sizeof(PhysicsFlags));
+    memset(t->physics_bodies, 0, max_things * sizeof(PhysicsBody));
 
     //note: using direct field access instead of HMM macros to avoid issues with TLSF allocator
     for (int i = 0; i < max_things; i++) {
@@ -1536,6 +1579,9 @@ void scene_reset(Scene* scene) {
     memset(scene->sound_channels, 0, cap * sizeof(tm_channel));
     memset(scene->sound_props, 0, cap * sizeof(SoundProps));
 
+    memset(scene->physics_flags, 0, cap * sizeof(PhysicsFlags));
+    memset(scene->physics_bodies, 0, cap * sizeof(PhysicsBody));
+
     for (int i = 0; i < cap; i++) {
         scene->transforms[i].pos = HMM_V3(0, 0, 0);
         scene->transforms[i].scale = HMM_V3(1, 1, 1);
@@ -1567,6 +1613,9 @@ void scene_destroy(Allocator* alloc, Scene* scene) {
     core_free(alloc, scene->sound_buffers);
     core_free(alloc, scene->sound_channels);
     core_free(alloc, scene->sound_props);
+
+    core_free(alloc, scene->physics_flags);
+    core_free(alloc, scene->physics_bodies);
 
     core_free(alloc, scene);
 }
@@ -1847,4 +1896,42 @@ void entity_clear_sound(Scene* scene, Entity e) {
     scene->sound_buffers[idx].id = HP_INVALID_HANDLE;
     scene->sound_channels[idx] = (tm_channel){0};
     scene->sound_props[idx] = (SoundProps){0};
+}
+
+void entity_set_rigid_body(Scene* scene, Entity e, ne_RigidBody body) {
+    if (!entity_valid(scene, e)) return;
+
+    int idx = hp_index(e.id);
+    scene->physics_bodies[idx].rigid = body;
+    scene->physics_flags[idx] |= ENTITY_HAS_PHYSICS | ENTITY_HAS_RIGIDBODY;
+    scene->physics_flags[idx] &= ~ENTITY_HAS_ANIMBODY;
+}
+
+void entity_clear_rigid_body(Scene *scene, ne_Simulator sim, Entity e) {
+    if (!entity_valid(scene, e)) return;
+    int idx = hp_index(e.id);
+    if (scene->physics_flags[idx] & ENTITY_HAS_RIGIDBODY) {
+        ne_sim_free_rigid_body(sim, scene->physics_bodies[idx].rigid);
+        scene->physics_bodies[idx].rigid = NULL;
+        scene->physics_flags[idx] = 0;
+    }
+}
+
+void entity_set_animated_body(Scene* scene, Entity e, ne_AnimBody body) {
+    if (!entity_valid(scene, e)) return;
+
+    int idx = hp_index(e.id);
+    scene->physics_bodies[idx].anim = body;
+    scene->physics_flags[idx] |= ENTITY_HAS_PHYSICS | ENTITY_HAS_ANIMBODY;
+    scene->physics_flags[idx] &= ~ENTITY_HAS_RIGIDBODY;
+}
+
+void entity_clear_animated_body(Scene *scene, ne_Simulator sim, Entity e) {
+    if (!entity_valid(scene, e)) return;
+    int idx = hp_index(e.id);
+    if (scene->physics_flags[idx] & ENTITY_HAS_ANIMBODY) {
+        ne_sim_free_anim_body(sim, scene->physics_bodies[idx].anim);
+        scene->physics_bodies[idx].anim = NULL;
+        scene->physics_flags[idx] = 0;
+    }
 }

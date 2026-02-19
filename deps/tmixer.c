@@ -768,6 +768,15 @@ void tm_channel_set_opaque(tm_channel channel, void* opaque) {
 	mt_mutex_unlock(&tm.lock);
 }
 
+bool tm_channel_isplaying(tm_channel channel) {
+	if (channel.index == 0) return false;
+	mt_mutex_lock(&tm.lock);
+	source_t* source = &tm.sources[channel.index - 1];
+	bool playing = (source->flags & TM_SOURCEFLAG_PLAYING) != 0;
+	mt_mutex_unlock(&tm.lock);
+	return playing;
+}
+
 void tm_channel_stop(tm_channel channel) {
 	mt_mutex_lock(&tm.lock);
 	source_t* source = &tm.sources[channel.index - 1];

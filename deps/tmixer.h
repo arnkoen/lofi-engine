@@ -111,6 +111,7 @@ void tm_channel_set_frequency(tm_channel channel, float frequency);
 float tm_channel_get_gain(tm_channel channel);
 void tm_stop_all_sources();
 
+bool tm_channel_isplaying(tm_channel channel);
 static inline bool tm_channel_isvalid(tm_channel channel) { return channel.index != 0; }
 static inline bool tm_channel_equals(tm_channel lhs, tm_channel rhs) { return lhs.index == rhs.index; }
 

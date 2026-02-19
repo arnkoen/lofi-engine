@@ -1,5 +1,7 @@
 package lofi
 
+import "core:math"
+
 Entity :: struct {
 	id: u32,
 }
@@ -18,6 +20,26 @@ Anim_Set :: struct {
 
 Sound :: struct {
 	id: u32,
+}
+
+Rigid_Body :: struct {
+	ptr: u64,
+}
+
+Anim_Body :: struct {
+	ptr: u64,
+}
+
+// Geometry types
+GEOM_BOX :: 0
+GEOM_SPHERE :: 1
+GEOM_CYLINDER :: 2
+
+Geom_Desc :: struct {
+	type: i32,
+	pos:  [3]f32,
+	rot:  [4]f32,
+	size: [3]f32, // box: w,h,d; sphere: diameter; cylinder: diameter, height
 }
 
 // Flags
@@ -142,17 +164,59 @@ foreign env {
 	@(link_name = "lo_clear_sound")
 	clear_sound :: proc(e: Entity) ---
 
-	@(link_name = "lo_sinf")
-	sinf :: proc(x: f32) -> f32 ---
+	@(link_name = "lo_create_rigid_body")
+	create_rigid_body :: proc() -> Rigid_Body ---
 
-	@(link_name = "lo_cosf")
-	cosf :: proc(x: f32) -> f32 ---
+	@(link_name = "lo_free_rigid_body")
+	free_rigid_body :: proc(body: Rigid_Body) ---
+
+	@(link_name = "lo_set_rigid_body")
+	set_rigid_body :: proc(e: Entity, body: Rigid_Body) ---
+
+	@(link_name = "lo_clear_rigid_body")
+	clear_rigid_body :: proc(e: Entity) ---
+
+	@(link_name = "lo_create_anim_body")
+	create_anim_body :: proc() -> Anim_Body ---
+
+	@(link_name = "lo_free_anim_body")
+	free_anim_body :: proc(body: Anim_Body) ---
+
+	@(link_name = "lo_set_anim_body")
+	set_anim_body :: proc(e: Entity, body: Anim_Body) ---
+
+	@(link_name = "lo_clear_anim_body")
+	clear_anim_body :: proc(e: Entity) ---
+
+	@(link_name = "lo_rb_set_pos")
+	rb_set_pos :: proc(body: Rigid_Body, pos: [^]f32) ---
+
+	@(link_name = "lo_rb_set_rot")
+	rb_set_rot :: proc(body: Rigid_Body, rot: [^]f32) ---
+
+	@(link_name = "lo_ab_set_pos")
+	ab_set_pos :: proc(body: Anim_Body, pos: [^]f32) ---
+
+	@(link_name = "lo_ab_set_rot")
+	ab_set_rot :: proc(body: Anim_Body, rot: [^]f32) ---
+
+	@(link_name = "lo_rb_set_mass")
+	rb_set_mass :: proc(body: Rigid_Body, mass: f32) ---
+
+	@(link_name = "lo_rb_add_geom")
+	rb_add_geom :: proc(body: Rigid_Body, desc: ^Geom_Desc) ---
+
+	@(link_name = "lo_ab_add_geom")
+	ab_add_geom :: proc(body: Anim_Body, desc: ^Geom_Desc) ---
 
 	@(link_name = "lo_set_campos")
 	set_cam_pos :: proc(pos: [^]f32) ---
 
 	@(link_name = "lo_set_cam_target")
 	set_cam_target :: proc(target: [^]f32) ---
+
+	@(link_name = "lo_lock_mouse")
+	lock_mouse :: proc(lock: bool) ---
 
 	@(link_name = "lo_dtx_layer")
 	dtx_layer :: proc(layer_id: i32) ---

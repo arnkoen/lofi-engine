@@ -1,4 +1,6 @@
 #include "core.h"
+#include "deps/ne.h"
+#include "lofi.h"
 #define SOKOL_IMPL
 #define SOKOL_GLCORE
 #include "deps/sokol_app.h"
@@ -12,7 +14,6 @@
 #define WA_IMPLEMENTATION
 //#define DEBUG
 #include "deps/wa.h"
-#include "lofi.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -22,6 +23,7 @@ static struct {
     Camera cam;
     RenderContext* gfx;
     AudioContext* sfx;
+    ne_Simulator sim;
     Scene* scene;
     Module mod;
     IoMemory wasm;
@@ -29,6 +31,7 @@ static struct {
     void* tlsf_pool;
     tlsf_t tlsf;
     Allocator allocator;
+    ne_Allocator ne_alloc;
     int function;
     int fn_mouse_pos, fn_mouse_button, fn_key;
 } ctx;
@@ -37,69 +40,57 @@ static inline void* wa_ptr(uint32_t offset) {
     return ctx.mod.memory[0].bytes + offset;
 }
 
-lo_Texture lo_load_texture(const char* path) {
+static uint32_t wa_load_texture(uint64_t path_ptr) {
+    const char* path = (const char*)wa_ptr((uint32_t)path_ptr);
     IoMemory data = {0};
     Result result = load_file(&ctx.arena, &data, path, false);
     if(result == RESULT_SUCCESS) {
         TextureHandle ret = gfx_load_texture(ctx.gfx, &ctx.arena, &data);
         arena_reset(&ctx.arena);
-        return (lo_Texture){ret.id};
+        return ret.id;
     }
     arena_reset(&ctx.arena);
     LOG_ERROR("Failed to load Texture %s\n", path);
-    return (lo_Texture){HP_INVALID_HANDLE};
+    return HP_INVALID_HANDLE;
 }
-
-lo_Model lo_load_model(const char* path) {
+static uint32_t wa_load_model(uint64_t path_ptr) {
+    const char* path = (const char*)wa_ptr((uint32_t)path_ptr);
     IoMemory data = {0};
     Result result = load_file(&ctx.arena, &data, path, false);
     if(result == RESULT_SUCCESS) {
         ModelHandle ret = gfx_load_model(ctx.gfx, &ctx.arena, &data);
         arena_reset(&ctx.arena);
-        return (lo_Model){ret.id};
+        return ret.id;
     }
     arena_reset(&ctx.arena);
     LOG_ERROR("Failed to load Model %s\n", path);
-    return (lo_Model){HP_INVALID_HANDLE};
+    return HP_INVALID_HANDLE;
 }
-
-lo_AnimSet lo_load_anims(const char* path) {
+static uint32_t wa_load_anims(uint64_t path_ptr) {
+    const char* path = (const char*)wa_ptr((uint32_t)path_ptr);
     IoMemory data = {0};
     Result result = load_file(&ctx.arena, &data, path, false);
     if(result == RESULT_SUCCESS) {
         AnimSetHandle ret = gfx_load_anims(ctx.gfx, &data);
         arena_reset(&ctx.arena);
-        return (lo_AnimSet){ret.id};
+        return ret.id;
     }
     arena_reset(&ctx.arena);
     LOG_ERROR("Failed to load AnimSet %s\n", path);
-    return (lo_AnimSet){HP_INVALID_HANDLE};
+    return HP_INVALID_HANDLE;
 }
-
-lo_Sound lo_load_sound(const char* path) {
+static uint32_t wa_load_sound(uint64_t path_ptr) {
+    const char* path = (const char*)wa_ptr((uint32_t)path_ptr);
     IoMemory data = {0};
     Result result = load_file(&ctx.arena, &data, path, false);
     if(result == RESULT_SUCCESS) {
         SoundBufferHandle ret = sfx_load_buffer(ctx.sfx, &data);
         arena_reset(&ctx.arena);
-        return (lo_Sound){ret.id};
+        return ret.id;
     }
     arena_reset(&ctx.arena);
     LOG_ERROR("Failed to load Sound %s\n", path);
-    return (lo_Sound){HP_INVALID_HANDLE};
-}
-
-static uint32_t wa_load_texture(uint64_t path_ptr) {
-    return lo_load_texture((const char*)wa_ptr((uint32_t)path_ptr)).id;
-}
-static uint32_t wa_load_model(uint64_t path_ptr) {
-    return lo_load_model((const char*)wa_ptr((uint32_t)path_ptr)).id;
-}
-static uint32_t wa_load_anims(uint64_t path_ptr) {
-    return lo_load_anims((const char*)wa_ptr((uint32_t)path_ptr)).id;
-}
-static uint32_t wa_load_sound(uint64_t path_ptr) {
-    return lo_load_sound((const char*)wa_ptr((uint32_t)path_ptr)).id;
+    return HP_INVALID_HANDLE;
 }
 
 static void wa_release_texture(uint64_t id) {
@@ -219,8 +210,96 @@ static void wa_clear_sound(uint64_t entity) {
     entity_clear_sound(ctx.scene, (Entity){(uint32_t)entity});
 }
 
-static float wa_sinf(float x) { return HMM_SinF(x); }
-static float wa_cosf(float x) { return HMM_CosF(x); }
+static uint64_t wa_create_rigid_body(void) {
+    return (uint64_t)(uintptr_t)ne_sim_create_rigid_body(ctx.sim);
+}
+static void wa_free_rigid_body(uint64_t body_u64) {
+    ne_sim_free_rigid_body(ctx.sim, (ne_RigidBody)(uintptr_t)body_u64);
+}
+static void wa_set_rigid_body(uint64_t entity_id, uint64_t body_u64) {
+    entity_set_rigid_body(ctx.scene, (Entity){(uint32_t)entity_id}, (ne_RigidBody)(uintptr_t)body_u64);
+}
+static void wa_clear_rigid_body(uint64_t entity_id) {
+    entity_clear_rigid_body(ctx.scene, ctx.sim, (Entity){(uint32_t)entity_id});
+}
+static uint64_t wa_create_anim_body(void) {
+    return (uint64_t)(uintptr_t)ne_sim_create_anim_body(ctx.sim);
+}
+static void wa_free_anim_body(uint64_t body_u64) {
+    ne_sim_free_anim_body(ctx.sim, (ne_AnimBody)(uintptr_t)body_u64);
+}
+static void wa_set_anim_body(uint64_t entity_id, uint64_t body_u64) {
+    entity_set_animated_body(ctx.scene, (Entity){(uint32_t)entity_id}, (ne_AnimBody)(uintptr_t)body_u64);
+}
+static void wa_clear_anim_body(uint64_t entity_id) {
+    entity_clear_animated_body(ctx.scene, ctx.sim, (Entity){(uint32_t)entity_id});
+}
+
+static void wa_rb_set_pos(uint64_t body_u64, uint64_t ptr) {
+    float* v = (float*)wa_ptr((uint32_t)ptr);
+    ne_rigid_body_set_pos((ne_RigidBody)(uintptr_t)body_u64, HMM_V3(v[0], v[1], v[2]));
+}
+static void wa_rb_set_rot(uint64_t body_u64, uint64_t ptr) {
+    float* v = (float*)wa_ptr((uint32_t)ptr);
+    ne_rigid_body_set_rot((ne_RigidBody)(uintptr_t)body_u64, HMM_Q(v[0], v[1], v[2], v[3]));
+}
+static void wa_ab_set_pos(uint64_t body_u64, uint64_t ptr) {
+    float* v = (float*)wa_ptr((uint32_t)ptr);
+    ne_anim_body_set_pos((ne_AnimBody)(uintptr_t)body_u64, HMM_V3(v[0], v[1], v[2]));
+}
+static void wa_ab_set_rot(uint64_t body_u64, uint64_t ptr) {
+    float* v = (float*)wa_ptr((uint32_t)ptr);
+    ne_anim_body_set_rot((ne_AnimBody)(uintptr_t)body_u64, HMM_Q(v[0], v[1], v[2], v[3]));
+}
+
+static void wa_rb_set_mass(uint64_t body_u64, float mass) {
+    ne_rigid_body_set_mass((ne_RigidBody)(uintptr_t)body_u64, mass);
+}
+static void wa_rb_add_geom(uint64_t body_u64, uint64_t ptr) {
+    ne_RigidBody body = (ne_RigidBody)(uintptr_t)body_u64;
+    lo_GeomDesc* desc = (lo_GeomDesc*)wa_ptr((uint32_t)ptr);
+    ne_Geom geom = ne_rigid_body_add_geom(body);
+    HMM_Mat4 r = HMM_QToM4(HMM_Q(desc->rot[0], desc->rot[1], desc->rot[2], desc->rot[3]));
+    r.Columns[3] = HMM_V4(desc->pos[0], desc->pos[1], desc->pos[2], 1.0f);
+    ne_geom_set_transform(geom, r);
+    float mass = ne_rigid_body_get_mass(body);
+    HMM_Vec3 tensor;
+    switch (desc->type) {
+        case LO_GEOM_BOX:
+            ne_geom_set_box_size(geom, desc->size[0], desc->size[1], desc->size[2]);
+            tensor = ne_box_inertia_tensor(desc->size[0], desc->size[1], desc->size[2], mass);
+            break;
+        case LO_GEOM_SPHERE:
+            ne_geom_set_sphere_diameter(geom, desc->size[0]);
+            tensor = ne_sphere_inertia_tensor(desc->size[0], mass);
+            break;
+        case LO_GEOM_CYLINDER:
+            ne_geom_set_cylinder(geom, desc->size[0], desc->size[1]);
+            tensor = ne_cylinder_inertia_tensor(desc->size[0], desc->size[1], mass);
+            break;
+        default:
+            tensor = HMM_V3(1.0f, 1.0f, 1.0f);
+            break;
+    }
+    ne_rigid_body_set_inertia_tensor(body, tensor);
+    ne_rigid_body_update_bounding_info(body);
+}
+static void wa_ab_add_geom(uint64_t body_u64, uint64_t ptr) {
+    ne_AnimBody body = (ne_AnimBody)(uintptr_t)body_u64;
+    lo_GeomDesc* desc = (lo_GeomDesc*)wa_ptr((uint32_t)ptr);
+    ne_Geom geom = ne_anim_body_add_geom(body);
+    HMM_Mat4 r = HMM_QToM4(HMM_Q(desc->rot[0], desc->rot[1], desc->rot[2], desc->rot[3]));
+    r.Columns[3] = HMM_V4(desc->pos[0], desc->pos[1], desc->pos[2], 1.0f);
+    ne_geom_set_transform(geom, r);
+    switch (desc->type) {
+        case LO_GEOM_BOX:      ne_geom_set_box_size(geom, desc->size[0], desc->size[1], desc->size[2]); break;
+        case LO_GEOM_SPHERE:   ne_geom_set_sphere_diameter(geom, desc->size[0]); break;
+        case LO_GEOM_CYLINDER: ne_geom_set_cylinder(geom, desc->size[0], desc->size[1]); break;
+    }
+    ne_anim_body_update_bounding_info(body);
+}
+
+static void wa_lock_mouse(uint64_t lock) { sapp_lock_mouse((bool)lock); }
 
 static void wa_set_campos(uint64_t ptr) {
     float* pos = (float*)wa_ptr((uint32_t)ptr);
@@ -231,7 +310,6 @@ static void wa_set_cam_target(uint64_t ptr) {
     ctx.cam.target = HMM_V3(t[0], t[1], t[2]);
 }
 
-/* Debug text */
 static void wa_dtx_layer(uint64_t layer_id) { sdtx_layer((int)layer_id); }
 static void wa_dtx_font(uint64_t font_index) { sdtx_font((int)font_index); }
 static void wa_dtx_canvas(float w, float h) { sdtx_canvas(w, h); }
@@ -343,8 +421,22 @@ static RTLink link[] = {
     { "lo_play_sound",     &wa_play_sound,    0, WA_vl },
     { "lo_stop_sound",     &wa_stop_sound,    0, WA_vl },
     { "lo_clear_sound",    &wa_clear_sound,   0, WA_vl },
-    { "lo_sinf",           &wa_sinf,          0, WA_ff },
-    { "lo_cosf",           &wa_cosf,          0, WA_ff },
+    { "lo_create_rigid_body", &wa_create_rigid_body, 0, WA_l    },
+    { "lo_free_rigid_body",   &wa_free_rigid_body,   0, WA_vl   },
+    { "lo_set_rigid_body",    &wa_set_rigid_body,    0, WA_vll  },
+    { "lo_clear_rigid_body",  &wa_clear_rigid_body,  0, WA_vl   },
+    { "lo_create_anim_body",  &wa_create_anim_body,  0, WA_l    },
+    { "lo_free_anim_body",    &wa_free_anim_body,    0, WA_vl   },
+    { "lo_set_anim_body",     &wa_set_anim_body,     0, WA_vll  },
+    { "lo_clear_anim_body",   &wa_clear_anim_body,   0, WA_vl   },
+    { "lo_rb_set_pos",        &wa_rb_set_pos,        0, WA_vll  },
+    { "lo_rb_set_rot",        &wa_rb_set_rot,        0, WA_vll  },
+    { "lo_ab_set_pos",        &wa_ab_set_pos,        0, WA_vll  },
+    { "lo_ab_set_rot",        &wa_ab_set_rot,        0, WA_vll  },
+    { "lo_rb_set_mass",       &wa_rb_set_mass,  0, WA_vlf  },
+    { "lo_rb_add_geom",       &wa_rb_add_geom,  0, WA_vll  },
+    { "lo_ab_add_geom",       &wa_ab_add_geom,  0, WA_vll  },
+    { "lo_lock_mouse", &wa_lock_mouse, 0, WA_vl  },
     { "lo_set_campos",     &wa_set_campos,    0, WA_vl },
     { "lo_set_cam_target", &wa_set_cam_target,0, WA_vl },
     //debug text
@@ -383,6 +475,13 @@ static void reload_game() {
         ctx.wasm = (IoMemory){0};
     }
     scene_reset(ctx.scene);
+    if(ctx.sim != NULL) {
+        ne_destroy_sim(ctx.sim);
+    }
+    ctx.sim = ne_create_sim(&(ne_Desc) {
+        .allocator = &ctx.ne_alloc,
+        .gravity = HMM_V3(0, -9.8f, 0),
+    });
     gfx_reset(ctx.gfx);
     sfx_reset(ctx.sfx);
     Result result = load_wasm(&ctx.wasm, "game.wasm");
@@ -423,6 +522,12 @@ static void init(void) {
         .free = tlsf_free_wrapper,
     };
 
+    ctx.ne_alloc = (ne_Allocator) {
+        .udata = ctx.tlsf,
+        .alloc = tlsf_alloc_wrapper,
+        .free = tlsf_free_wrapper,
+    };
+
     size_t memsize = 1024 * 1024;
     void* buffer = core_alloc(&ctx.allocator, memsize, 0);
 
@@ -448,6 +553,9 @@ static void init(void) {
     });
 
     ctx.sfx = sfx_new_context(&ctx.allocator, 32);
+
+
+
     ctx.scene = scene_new(&ctx.allocator, 512);
 
     reload_game();
@@ -458,6 +566,8 @@ static void frame(void) {
 
     wa_push_f32(&ctx.mod, dt);
     wa_call(&ctx.mod, ctx.function);
+
+    ne_update(ctx.sim, ctx.scene, dt);
 
     HMM_Vec3 listener_forward = HMM_Norm(HMM_SubV3(ctx.cam.target, ctx.cam.position));
     sfx_update(ctx.sfx, ctx.cam.position, listener_forward, ctx.scene, dt);
@@ -477,8 +587,8 @@ static void event(const sapp_event* ev) {
     switch (ev->type) {
     case SAPP_EVENTTYPE_MOUSE_MOVE:
         if (ctx.fn_mouse_pos >= 0) {
-            wa_push_f32(&ctx.mod, ev->mouse_x);
-            wa_push_f32(&ctx.mod, ev->mouse_y);
+            wa_push_f32(&ctx.mod, ev->mouse_dx);
+            wa_push_f32(&ctx.mod, ev->mouse_dy);
             wa_call(&ctx.mod, ctx.fn_mouse_pos);
         }
         break;
@@ -514,10 +624,11 @@ sapp_desc sokol_main(int argc, char* argv[]) {
         .frame_cb = frame,
         .cleanup_cb = cleanup,
         .event_cb = event,
-        .width = 1280,
-        .height = 720,
+        .width = 800,
+        .height = 600,
         .window_title = "LOFI",
         .swap_interval = 1,
+        .sample_count = 1,
         .icon.sokol_default = true,
         .win32_console_attach = true,
     };

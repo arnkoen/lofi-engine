@@ -1,8 +1,21 @@
 pub const Entity = packed struct { id: u32 = 0 };
+pub const RigidBody = packed struct { ptr: u64 = 0 };
+pub const AnimBody = packed struct { ptr: u64 = 0 };
 pub const Texture = packed struct { id: u32 = 0 };
 pub const Model = packed struct { id: u32 = 0 };
 pub const AnimSet = packed struct { id: u32 = 0 };
 pub const Sound = packed struct { id: u32 = 0 };
+
+pub const GEOM_BOX: i32 = 0;
+pub const GEOM_SPHERE: i32 = 1;
+pub const GEOM_CYLINDER: i32 = 2;
+
+pub const GeomDesc = extern struct {
+    typ: i32,
+    pos: [3]f32,
+    rot: [4]f32,
+    size: [3]f32, // box: w,h,d; sphere: diameter; cylinder: diameter, height
+};
 
 pub const ANIM_PLAY: i32 = 1 << 0;
 pub const ANIM_LOOP: i32 = 1 << 1;
@@ -65,11 +78,27 @@ const env = struct {
     extern "env" fn lo_stop_sound(e: Entity) void;
     extern "env" fn lo_clear_sound(e: Entity) void;
 
-    extern "env" fn lo_sinf(x: f32) f32;
-    extern "env" fn lo_cosf(x: f32) f32;
+    extern "env" fn lo_create_rigid_body() RigidBody;
+    extern "env" fn lo_free_rigid_body(body: RigidBody) void;
+    extern "env" fn lo_set_rigid_body(e: Entity, body: RigidBody) void;
+    extern "env" fn lo_clear_rigid_body(e: Entity) void;
+    extern "env" fn lo_create_anim_body() AnimBody;
+    extern "env" fn lo_free_anim_body(body: AnimBody) void;
+    extern "env" fn lo_set_anim_body(e: Entity, body: AnimBody) void;
+    extern "env" fn lo_clear_anim_body(e: Entity) void;
+
+    extern "env" fn lo_rb_set_pos(body: RigidBody, pos: [*]const f32) void;
+    extern "env" fn lo_rb_set_rot(body: RigidBody, rot: [*]const f32) void;
+    extern "env" fn lo_ab_set_pos(body: AnimBody, pos: [*]const f32) void;
+    extern "env" fn lo_ab_set_rot(body: AnimBody, rot: [*]const f32) void;
+
+    extern "env" fn lo_rb_set_mass(body: RigidBody, mass: f32) void;
+    extern "env" fn lo_rb_add_geom(body: RigidBody, desc: *const GeomDesc) void;
+    extern "env" fn lo_ab_add_geom(body: AnimBody, desc: *const GeomDesc) void;
 
     extern "env" fn lo_set_campos(pos: [*]const f32) void;
     extern "env" fn lo_set_cam_target(target: [*]const f32) void;
+    extern "env" fn lo_lock_mouse(lock: bool) void;
 
     extern "env" fn lo_dtx_layer(layer_id: i32) void;
     extern "env" fn lo_dtx_font(font_index: i32) void;
@@ -131,11 +160,27 @@ pub const playSound = env.lo_play_sound;
 pub const stopSound = env.lo_stop_sound;
 pub const clearSound = env.lo_clear_sound;
 
-pub const sinf = env.lo_sinf;
-pub const cosf = env.lo_cosf;
+pub const createRigidBody = env.lo_create_rigid_body;
+pub const freeRigidBody = env.lo_free_rigid_body;
+pub const setRigidBody = env.lo_set_rigid_body;
+pub const clearRigidBody = env.lo_clear_rigid_body;
+pub const createAnimBody = env.lo_create_anim_body;
+pub const freeAnimBody = env.lo_free_anim_body;
+pub const setAnimBody = env.lo_set_anim_body;
+pub const clearAnimBody = env.lo_clear_anim_body;
+
+pub const rbSetPos = env.lo_rb_set_pos;
+pub const rbSetRot = env.lo_rb_set_rot;
+pub const abSetPos = env.lo_ab_set_pos;
+pub const abSetRot = env.lo_ab_set_rot;
+
+pub const rbSetMass = env.lo_rb_set_mass;
+pub const rbAddGeom = env.lo_rb_add_geom;
+pub const abAddGeom = env.lo_ab_add_geom;
 
 pub const setCamPos = env.lo_set_campos;
 pub const setCamTarget = env.lo_set_cam_target;
+pub const lockMouse = env.lo_lock_mouse;
 
 pub const dtxLayer = env.lo_dtx_layer;
 pub const dtxFont = env.lo_dtx_font;

@@ -627,11 +627,12 @@ static int wa_find_blocks(Module *m, Block *func)
         case 0x1d: case 0x1e: case 0x20: case 0x21: case 0x22: case 0x23: case 0x24:/* get/local.set, local.tee, get/global.set */
         case 0x41: case 0xfc09: case 0xfc0b: wa_read_LEB(m, &pos, 32); break;       /* i32.const, data.drop, memory.fill */
         case 0x11: case 0x13: wa_read_LEB(m, &pos, 32); wa_read_LEB(m, &pos, 1); break; /* call_indirect, return_call_indirect */
+        case 0x1c: { uint32_t tcount = wa_read_LEB(m, &pos, 32); while(tcount--) wa_read_u8(m, &pos); break; } /* typed_select */
         case 0x42: wa_read_LEB(m, &pos, 64); break;                                 /* i64.const */
         case 0x43: wa_read_u32(m, &pos); break;                                     /* f32.const */
         case 0x44: wa_read_u64(m, &pos); break;                                     /* f64.const */
         case 0x02: case 0x03: case 0x04: wa_read_LEB(m, &pos, 7); break;            /* block, loop, if */
-        case 0x28: case 0x29: case 0x2a: case 0x2b: case 0x2c: case 0x2d: case 0x2f:/* *.load*, *.store*, memory.init, memory.copy */
+        case 0x28: case 0x29: case 0x2a: case 0x2b: case 0x2c: case 0x2d: case 0x2e: case 0x2f:/* *.load*, *.store*, memory.init, memory.copy */
         case 0x30: case 0x31: case 0x32: case 0x33: case 0x34: case 0x35: case 0x36:
         case 0x37: case 0x38: case 0x39: case 0x3a: case 0x3b: case 0x3c: case 0x3d:
         case 0x3e: case 0xfc08: case 0xfc0a: wa_read_LEB(m, &pos, 32); wa_read_LEB(m, &pos, 32); break;
@@ -981,6 +982,7 @@ static int wa_external_call(Module *m, uint32_t fidx) {
         case WA_illlllllll: ret.u32 = ((uint32_t(*)(uint64_t,uint64_t,uint64_t,uint64_t,uint64_t,uint64_t,uint64_t,uint64_t,uint64_t))addr) (args[1].u64,args[2].u64,args[3].u64,args[4].u64,args[5].u64,args[6].u64,args[7].u64,args[8].u64,args[9].u64); break;
         case WA_llllllllll: ret.u64 = ((uint64_t(*)(uint64_t,uint64_t,uint64_t,uint64_t,uint64_t,uint64_t,uint64_t,uint64_t,uint64_t))addr) (args[1].u64,args[2].u64,args[3].u64,args[4].u64,args[5].u64,args[6].u64,args[7].u64,args[8].u64,args[9].u64); break;
 #endif
+        case WA_5(WA_v,WA_l,WA_l,WA_l,WA_f): ((void(*)(uint64_t,uint64_t,uint64_t,float))addr) (args[0].u64, args[1].u64, args[2].u64, args[3].f32); break;
         default: ERR(("wa_external_call: unknown function prototype")); m->err_code = WA_ERR_BOUND; break;
         }
 #ifdef __GNUC__
@@ -1057,6 +1059,7 @@ static int wa_interpret(Module *m) {
         if(m->single_step || n < WA_NUMBRK) WA_DEBUGGER(m, BRK_CODE, cur_pc);
 #endif
         wa_check_stack(m, 0);
+        stack = m->stack;  /* reload after potential realloc */
         if(m->sp < -1) { ERR(("wa_interpret: stack underflow")); m->err_code = WA_ERR_BOUND; return 0; }
 
         switch (opcode) {
@@ -1149,12 +1152,15 @@ static int wa_interpret(Module *m) {
             if(fidx >= m->function_count) { ERR(("wa_interpret: bad function index")); m->err_code = WA_ERR_BOUND; return 0; }
             if(m->functions[fidx].start_addr) {
                 wa_internal_call(m, fidx);
+                stack = m->stack;  /* reload after potential realloc */
                 if(m->functions[fidx].type.param_count + m->functions[fidx].local_count != (uint32_t)(m->sp - m->fp + 1)) {
                     ERR(("wa_interpret: call type mismatch (param counts differ)"));
                     m->err_code = WA_ERR_PROTO; return 0;
                 }
-            } else
+            } else {
                 wa_external_call(m, fidx);
+                stack = m->stack;  /* reload after potential realloc */
+            }
             continue;
         case 0x11:  /* call_indirect */
         case 0x13:  /* return_call_indirect */
@@ -1169,12 +1175,15 @@ static int wa_interpret(Module *m) {
             if(fidx >= m->function_count) { ERR(("wa_interpret: bad function index")); m->err_code = WA_ERR_BOUND; return 0; }
             if(m->functions[fidx].start_addr) {
                 wa_internal_call(m, fidx);
+                stack = m->stack;  /* reload after potential realloc */
                 if(m->functions[fidx].type.param_count + m->functions[fidx].local_count != (uint32_t)(m->sp - m->fp + 1)) {
                     ERR(("wa_interpret: call type mismatch (param counts differ)"));
                     m->err_code = WA_ERR_PROTO; return 0;
                 }
-            } else
+            } else {
                 wa_external_call(m, fidx);
+                stack = m->stack;  /* reload after potential realloc */
+            }
             continue;
 
         /*** Parametric operators ***/
@@ -1182,6 +1191,9 @@ static int wa_interpret(Module *m) {
         case 0xc5:  /* drop64 */
             m->sp--;
             continue;
+        case 0x1c:  /* typed_select - skip type annotation, same semantics as select */
+            { uint32_t tcount = wa_read_LEB(m, &m->pc, 32); while(tcount--) wa_read_u8(m, &m->pc); }
+            /* fallthrough */
         case 0x1b:  /* select */
         case 0xc6:  /* select64 */
             a = stack[m->sp].u32;
@@ -1291,7 +1303,7 @@ static int wa_interpret(Module *m) {
             continue;
 
         /* Memory load operators */
-        case 0x28: case 0x29: case 0x2a: case 0x2b: case 0x2c: case 0x2d: case 0x2f:
+        case 0x28: case 0x29: case 0x2a: case 0x2b: case 0x2c: case 0x2d: case 0x2e: case 0x2f:
         case 0x30: case 0x31: case 0x32: case 0x33: case 0x34: case 0x35:
             wa_read_LEB(m, &m->pc, 32); /* flags */
             d = wa_read_LEB(m, &m->pc, 64);
